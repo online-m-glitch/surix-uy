@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Surix Uruguay · Estado de situación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --surface:#fff; --surface-2:#f9fafb; --border:#e3e6ea;
+  --text:#0f1720; --text-2:#4b5563; --muted:#8a94a3;
+  --brand:#0b5cad; --brand-2:#e8f1fb;
+  --s1:#2a78d6; --s2:#eb6834;
+  --good:#12805c; --good-bg:#e7f6ef; --warn:#b26a00; --warn-bg:#fff4e0; --bad:#c23b3a; --bad-bg:#fdecec;
+  --radius:10px; --shadow:0 1px 2px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111315; --surface:#1a1c1f; --surface-2:#202327; --border:#2d3136;
+    --text:#f2f4f6; --text-2:#c3c7cd; --muted:#8b939e;
+    --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926;
+    --good:#4cc796; --good-bg:#15291f; --warn:#f0b04a; --warn-bg:#2d2412; --bad:#f07574; --bad-bg:#2e1718;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111315; --surface:#1a1c1f; --surface-2:#202327; --border:#2d3136;
+  --text:#f2f4f6; --text-2:#c3c7cd; --muted:#8b939e;
+  --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926;
+  --good:#4cc796; --good-bg:#15291f; --warn:#f0b04a; --warn-bg:#2d2412; --bad:#f07574; --bad-bg:#2e1718;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.top{display:flex;align-items:center;gap:12px;padding:10px 20px;max-width:1400px;margin:auto}
+.logo{font-weight:700;font-size:16px;letter-spacing:-.01em}
+.logo span{color:var(--brand)}
+.top .sp{flex:1}
+.tc-chip{font-size:12px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);padding:4px 10px;border-radius:99px;cursor:pointer}
+nav{display:flex;gap:2px;overflow-x:auto;padding:0 16px;max-width:1400px;margin:auto;scrollbar-width:none}
+nav button{border:0;background:none;padding:10px 12px;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+nav button.on{color:var(--brand);border-color:var(--brand)}
+main{max-width:1400px;margin:auto;padding:20px}
+h2{font-size:18px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.two{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);min-width:0}
+.card h3{font-size:13px;margin:0 0 10px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.kpi .l{font-size:12px;color:var(--text-2);font-weight:500}
+.kpi .v{font-size:24px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.btn{border:1px solid var(--border);background:var(--surface);padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:none}
+.btn.danger{color:var(--bad)}
+input,select,textarea{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 10px;width:100%}
+.row input,.row select{width:auto}
+label.f{display:block;font-size:12px;color:var(--text-2);font-weight:500}
+label.f>input,label.f>select,label.f>textarea{margin-top:4px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--text-2);font-size:12px;padding:8px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface-2);position:sticky;top:0}
+td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:hover td{background:var(--surface-2)}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);white-space:nowrap}
+.tag.good{background:var(--good-bg);color:var(--good);border-color:transparent}
+.tag.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.tag.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.empty{color:var(--muted);text-align:center;padding:24px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;z-index:50;padding:40px 16px;overflow:auto}
+.modal{background:var(--surface);border-radius:12px;width:100%;max-width:620px;padding:20px;border:1px solid var(--border)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fgrid .full{grid-column:1/-1}
+.login{max-width:380px;margin:10vh auto}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--surface);padding:10px 14px;border-radius:8px;z-index:99;max-width:360px}
+.chart-box{position:relative;height:260px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text-2);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.list li{padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px}
+.list{list-style:none;margin:0;padding:0}
+.list li>span:last-child{white-space:nowrap;text-align:right}
+.list li:last-child{border:0}
+.muted{color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;color:var(--text-2)}
+.seg button.on{background:var(--brand-2);color:var(--brand);font-weight:600}
+.kanban{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:10px;overflow-x:auto}
+.kcol{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:120px}
+.kcol h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--text-2);display:flex;justify-content:space-between}
+.kc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;cursor:pointer;font-size:13px}
+.kc b{display:block}
+.drop{display:block;border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;color:var(--text-2);cursor:pointer}
+@media (max-width:640px){main{padding:16px}.top{flex-wrap:wrap;padding:10px 16px}.logo{font-size:14px}#userEmail{display:none}.kpis{grid-template-columns:1fr 1fr}.kpi .v{font-size:18px}.fgrid{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
+@media print{header nav,.btn,.noprint{display:none!important}body{background:#fff}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="hidden">
+  <div class="login card">
+    <div class="logo" style="font-size:20px;margin-bottom:4px">Surix <span>Uruguay</span></div>
+    <p class="sub">Estado de situación · acceso socios</p>
+    <label class="f">Email<input id="lgEmail" type="email" autocomplete="username"></label><br>
+    <label class="f">Contraseña<input id="lgPass" type="password" autocomplete="current-password"></label><br>
+    <div class="row"><button class="btn pri" id="btnLogin">Ingresar</button>
+      <button class="btn ghost" id="btnSignup">Crear cuenta</button>
+      <button class="btn ghost" id="btnReset">Olvidé la clave</button></div>
+    <p class="sub" id="lgMsg" style="margin-top:12px"></p>
+  </div>
+</div>
+
+<div id="noAccess" class="hidden">
+  <div class="login card"><h2>Sin acceso</h2>
+  <p class="sub">Tu email (<b id="naEmail"></b>) no está habilitado como socio. Pedile a un socio que te agregue en la pestaña <b>Socios</b>.</p>
+  <button class="btn" onclick="logout()">Salir</button></div>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <div class="top">
+    <div class="logo">Surix <span>Uruguay</span> · Estado de situación</div>
+    <div class="sp"></div>
+    <span class="tc-chip" id="tcChip" title="Tipo de cambio usado para consolidar">TC —</span>
+    <button class="btn sm ghost" id="themeBtn" title="Tema">◐</button>
+    <span class="muted" id="userEmail" style="font-size:12px"></span>
+    <button class="btn sm" onclick="logout()">Salir</button>
+  </div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+// ================= Config =================
+const SUPABASE_URL = 'https://gbtjoxedecnkzwponyca.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Jl9-IRiwBelmjDW1ORsRvw_Jlhy8y1h';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TABS = [
+  ['resumen','Resumen'],['bancos','Bancos'],['movimientos','Movimientos'],['clientes','Cta. cte. clientes'],
+  ['proveedores','Deuda proveedores'],['stock','Stock'],['oportunidades','Oportunidades'],['socios','Socios'],
+  ['importar','Importar Excel'],['config','Configuración']
+];
+const S = { tab:'resumen', data:{}, tc:null, period:'semana' };
+
+// ================= Helpers =================
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (n, cur) => {
+  const v = Number(n||0);
+  const s = v.toLocaleString('es-UY',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return cur ? (cur==='USD'?'US$ ':'$ ')+s : s;
+};
+const fmt0 = (n, cur) => (cur==='USD'?'US$ ':cur==='UYU'?'$ ':'') + Number(n||0).toLocaleString('es-UY',{maximumFractionDigits:0});
+const fdate = d => d ? d.split('-').reverse().join('/') : '';
+const today = () => new Date().toISOString().slice(0,10);
+const toUSD = (amt, cur) => cur==='USD' ? Number(amt||0) : (S.tc ? Number(amt||0)/S.tc : 0);
+function toast(msg, ms=3000){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+function sign(n){ return n>0.004?'pos':n<-0.004?'neg':''; }
+
+async function fetchAll(table, select='*', order='id', asc=false){
+  let out=[], from=0, size=1000;
+  for(;;){
+    let q = sb.from(table).select(select).range(from, from+size-1);
+    if(order) q = q.order(order,{ascending:asc});
+    const {data, error} = await q;
+    if(error){ toast('Error '+table+': '+error.message, 6000); break; }
+    out = out.concat(data); if(data.length<size) break; from+=size;
+  }
+  return out;
+}
+
+async function loadAll(){
+  const [cuentas,saldos,movs,clientes,proveedores,socios,vsocios,docs,ccc,ccp,productos,vstock,smov,opps,tc] = await Promise.all([
+    fetchAll('cuentas','*','nombre',true), fetchAll('v_saldos_cuentas','*','nombre',true),
+    fetchAll('movimientos','*, cuentas(nombre,moneda), clientes(nombre), proveedores(nombre), socios(nombre)','fecha',false),
+    fetchAll('clientes','*','nombre',true), fetchAll('proveedores','*','nombre',true),
+    fetchAll('socios','*','nombre',true), fetchAll('v_socios','*',null),
+    fetchAll('documentos','*, clientes(nombre), proveedores(nombre)','fecha',false),
+    fetchAll('v_cc_clientes','*','nombre',true), fetchAll('v_cc_proveedores','*','nombre',true),
+    fetchAll('productos','*','nombre',true), fetchAll('v_stock','*','nombre',true),
+    fetchAll('stock_movimientos','*, productos(sku,nombre)','fecha',false),
+    fetchAll('oportunidades','*','actualizado',false), fetchAll('tipo_cambio','*','fecha',false)
+  ]);
+  S.data = {cuentas,saldos,movs,clientes,proveedores,socios,vsocios,docs,ccc,ccp,productos,vstock,smov,opps,tc};
+  S.tc = tc[0] ? Number(tc[0].usd_uyu) : null;
+  $('#tcChip').textContent = S.tc ? `TC ${S.tc.toLocaleString('es-UY')} · ${fdate(tc[0].fecha)}` : 'Cargar tipo de cambio';
+}
+
+// ================= Auth =================
+async function boot(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ show('loginView'); return; }
+  const {data:ok} = await sb.rpc('es_socio');
+  if(!ok){ $('#naEmail').textContent = session.user.email; show('noAccess'); return; }
+  $('#userEmail').textContent = session.user.email;
+  show('app'); renderNav(); await refresh();
+}
+function show(id){ ['loginView','noAccess','app'].forEach(x=>$('#'+x).classList.toggle('hidden', x!==id)); }
+async function logout(){ await sb.auth.signOut(); location.reload(); }
+$('#btnLogin').onclick = async()=>{
+  const {error} = await sb.auth.signInWithPassword({email:$('#lgEmail').value.trim(), password:$('#lgPass').value});
+  if(error) $('#lgMsg').textContent = 'No se pudo ingresar: '+error.message; else boot();
+};
+$('#lgPass').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#btnLogin').click(); });
+$('#btnSignup').onclick = async()=>{
+  const email=$('#lgEmail').value.trim(), password=$('#lgPass').value;
+  if(!email || password.length<6){ $('#lgMsg').textContent='Ingresá email y una contraseña de al menos 6 caracteres.'; return; }
+  const {data, error} = await sb.auth.signUp({email, password, options:{emailRedirectTo: location.href.split('#')[0]}});
+  if(error) $('#lgMsg').textContent = error.message;
+  else if(data.session) boot();
+  else $('#lgMsg').textContent = 'Cuenta creada. Revisá tu email para confirmarla y después ingresá.';
+};
+$('#btnReset').onclick = async()=>{
+  const email=$('#lgEmail').value.trim(); if(!email){ $('#lgMsg').textContent='Escribí tu email primero.'; return; }
+  const {error} = await sb.auth.resetPasswordForEmail(email,{redirectTo: location.href.split('#')[0]});
+  $('#lgMsg').textContent = error ? error.message : 'Te enviamos un email para restablecer la clave.';
+};
+sb.auth.onAuthStateChange((ev)=>{ if(ev==='PASSWORD_RECOVERY'){ const p=prompt('Nueva contraseña (mín. 6):'); if(p) sb.auth.updateUser({password:p}).then(()=>toast('Contraseña actualizada')); } });
+
+// theme
+(function(){ let t=null; try{t=localStorage.getItem('suy-theme')}catch(e){} if(t) document.documentElement.dataset.theme=t; })();
+$('#themeBtn').onclick=()=>{ const cur=document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  const n=cur==='dark'?'light':'dark'; document.documentElement.dataset.theme=n; try{localStorage.setItem('suy-theme',n)}catch(e){} render(); };
+$('#tcChip').onclick=()=>openForm('tipo_cambio');
+
+// ================= Nav / render =================
+function renderNav(){
+  $('#nav').innerHTML = TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${l}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; renderNav(); render(); try{history.replaceState(null,'','#'+S.tab)}catch(e){} });
+}
+async function refresh(){ await loadAll(); render(); }
+let charts=[];
+function render(){
+  charts.forEach(c=>c.destroy()); charts=[];
+  const f = {resumen:vResumen,bancos:vBancos,movimientos:vMovimientos,clientes:vClientes,proveedores:vProveedores,
+    stock:vStock,oportunidades:vOpps,socios:vSocios,importar:vImportar,config:vConfig}[S.tab];
+  $('#main').innerHTML = f(); (AFTER[S.tab]||(()=>{}))();
+}
+const AFTER = {};
+function table(cols, rows, empty='Sin datos todavía'){
+  if(!rows.length) return `<div class="empty">${empty}</div>`;
+  return `<div class="tw"><table><thead><tr>${cols.map(c=>`<th class="${c.n?'n':''}">${c.h}</th>`).join('')}</tr></thead><tbody>${
+    rows.map(r=>`<tr>${cols.map(c=>`<td class="${c.n?'n':''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+const actions = (tbl,id) => `<span class="noprint" style="white-space:nowrap"><button class="btn sm ghost" onclick="openForm('${tbl}',${id})">✎</button><button class="btn sm ghost danger" onclick="delRow('${tbl}',${id})">✕</button></span>`;
+
+// ================= Period helpers =================
+function periodRange(p){
+  const d=new Date(); d.setHours(0,0,0,0); let from;
+  if(p==='semana'){ const w=(d.getDay()+6)%7; from=new Date(d); from.setDate(d.getDate()-w); }
+  else if(p==='mes'){ from=new Date(d.getFullYear(), d.getMonth(), 1); }
+  else if(p==='anio'){ from=new Date(d.getFullYear(),0,1); }
+  else from=new Date(2000,0,1);
+  return from.toISOString().slice(0,10);
+}
+function flows(from){
+  const r={UYU:{ingreso:0,pago:0,aporte:0,retiro:0},USD:{ingreso:0,pago:0,aporte:0,retiro:0}};
+  S.data.movs.filter(m=>m.fecha>=from).forEach(m=>{ const c=m.cuentas?.moneda; if(r[c] && r[c][m.tipo]!==undefined) r[c][m.tipo]+=Number(m.monto); });
+  return r;
+}
+
+// ================= Resumen =================
+function vResumen(){
+  const D=S.data;
+  const bank = {UYU:0,USD:0}; D.saldos.filter(s=>s.activa).forEach(s=>bank[s.moneda]+=Number(s.saldo));
+  const cons = bank.USD + toUSD(bank.UYU,'UYU');
+  const cxc = {UYU:0,USD:0}; D.ccc.forEach(r=>{ if(r.saldo>0) cxc[r.moneda]+=Number(r.saldo); });
+  const cxp = {UYU:0,USD:0}; D.ccp.forEach(r=>{ if(r.saldo>0) cxp[r.moneda]+=Number(r.saldo); });
+  const stockVal = D.vstock.reduce((a,p)=>a+toUSD(Math.max(0,p.stock)*Number(p.costo||0), p.moneda_costo),0);
+  const openOpps = D.opps.filter(o=>!['ganada','perdida'].includes(o.etapa));
+  const pipe = openOpps.reduce((a,o)=>a+toUSD(o.monto_estimado,o.moneda),0);
+  const pipeW = openOpps.reduce((a,o)=>a+toUSD(o.monto_estimado,o.moneda)*(o.probabilidad||0)/100,0);
+  const net = cons + toUSD(cxc.UYU,'UYU')+cxc.USD - (toUSD(cxp.UYU,'UYU')+cxp.USD) + stockVal;
+  const from = periodRange(S.period); const fl = flows(from);
+  const low = D.vstock.filter(p=>p.activo && Number(p.stock) < Number(p.stock_minimo||0));
+  const in30 = new Date(Date.now()+30*864e5).toISOString().slice(0,10);
+  const venc = D.docs.filter(d=>d.vencimiento && d.vencimiento<=in30).map(d=>{
+      const cc = d.entidad==='cliente' ? D.ccc.find(x=>x.cliente_id===d.cliente_id && x.moneda===d.moneda) : D.ccp.find(x=>x.proveedor_id===d.proveedor_id && x.moneda===d.moneda);
+      return {...d, pendiente: cc && cc.saldo>0.004};
+    }).filter(d=>d.pendiente).sort((a,b)=>a.vencimiento.localeCompare(b.vencimiento)).slice(0,8);
+  const next = openOpps.filter(o=>o.fecha_proximo).sort((a,b)=>a.fecha_proximo.localeCompare(b.fecha_proximo)).slice(0,6);
+  const noTC = !S.tc ? `<div class="card" style="border-color:var(--warn);margin-bottom:14px"><b>Falta el tipo de cambio.</b> Cargalo para ver los consolidados en USD. <button class="btn sm" onclick="openForm('tipo_cambio')">Cargar TC</button></div>`:'';
+  const P = {semana:'Esta semana',mes:'Este mes',anio:'Este año',todo:'Histórico'};
+  const flowRow = (lab, k, cls) => `<tr><td>${lab}</td><td class="n ${cls}">${fmt(fl.UYU[k],'UYU')}</td><td class="n ${cls}">${fmt(fl.USD[k],'USD')}</td></tr>`;
+  const netUYU = fl.UYU.ingreso+fl.UYU.aporte-fl.UYU.pago-fl.UYU.retiro, netUSD = fl.USD.ingreso+fl.USD.aporte-fl.USD.pago-fl.USD.retiro;
+  return `
+  <div class="row between" style="margin-bottom:14px">
+    <div><h2>Estado de situación</h2><p class="sub" style="margin:0">Al ${new Date().toLocaleDateString('es-UY')} · consolidado en USD con TC ${S.tc||'—'}</p></div>
+    <div class="row noprint"><button class="btn" onclick="refresh()">↻ Actualizar</button><button class="btn" onclick="print()">Imprimir</button></div>
+  </div>
+  ${noTC}
+  <div class="grid kpis">
+    <div class="card kpi"><div class="l">Bancos · Pesos</div><div class="v">${fmt0(bank.UYU,'UYU')}</div><div class="s">≈ ${fmt0(toUSD(bank.UYU,'UYU'),'USD')}</div></div>
+    <div class="card kpi"><div class="l">Bancos · Dólares</div><div class="v">${fmt0(bank.USD,'USD')}</div><div class="s">&nbsp;</div></div>
+    <div class="card kpi"><div class="l">Disponible total (USD)</div><div class="v">${fmt0(cons,'USD')}</div><div class="s">pesos + dólares</div></div>
+    <div class="card kpi"><div class="l">Nos deben (clientes)</div><div class="v">${fmt0(cxc.USD+toUSD(cxc.UYU,'UYU'),'USD')}</div><div class="s">${fmt0(cxc.UYU,'UYU')} · ${fmt0(cxc.USD,'USD')}</div></div>
+    <div class="card kpi"><div class="l">Debemos (proveedores)</div><div class="v">${fmt0(cxp.USD+toUSD(cxp.UYU,'UYU'),'USD')}</div><div class="s">${fmt0(cxp.UYU,'UYU')} · ${fmt0(cxp.USD,'USD')}</div></div>
+    <div class="card kpi"><div class="l">Inventario a costo</div><div class="v">${fmt0(stockVal,'USD')}</div><div class="s">${D.vstock.filter(p=>p.stock>0).length} productos con stock</div></div>
+    <div class="card kpi"><div class="l">Patrimonio operativo</div><div class="v ${sign(net)}">${fmt0(net,'USD')}</div><div class="s">caja + cobrar − pagar + stock</div></div>
+    <div class="card kpi"><div class="l">Oportunidades abiertas</div><div class="v">${fmt0(pipe,'USD')}</div><div class="s">${openOpps.length} en curso · ponderado ${fmt0(pipeW,'USD')}</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:14px">
+    <div class="card">
+      <div class="row between"><h3>Flujo del período</h3>
+        <div class="seg noprint">${Object.entries(P).map(([k,l])=>`<button class="${S.period===k?'on':''}" onclick="S.period='${k}';render()">${l}</button>`).join('')}</div></div>
+      <p class="sub" style="margin:4px 0 8px">${P[S.period]}${S.period!=='todo'?' · desde '+fdate(from):''}</p>
+      <table><thead><tr><th></th><th class="n">Pesos</th><th class="n">Dólares</th></tr></thead><tbody>
+        ${flowRow('Ingresos / cobros','ingreso','pos')}${flowRow('Pagos / gastos','pago','neg')}
+        ${flowRow('Aportes de socios','aporte','')}${flowRow('Retiros de socios','retiro','')}
+        <tr><td><b>Variación neta</b></td><td class="n ${sign(netUYU)}"><b>${fmt(netUYU,'UYU')}</b></td><td class="n ${sign(netUSD)}"><b>${fmt(netUSD,'USD')}</b></td></tr>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <h3>Ingresos vs. pagos · últimas 12 semanas (USD eq.)</h3>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Ingresos</span><span><i style="background:var(--s2)"></i>Pagos</span></div>
+      <div class="chart-box"><canvas id="chWeeks" aria-label="Ingresos y pagos por semana"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid two" style="margin-top:14px">
+    <div class="card"><h3>Saldos por cuenta</h3>
+      ${table([{h:'Cuenta',f:r=>esc(r.nombre)+(r.banco?` <span class="muted">· ${esc(r.banco)}</span>`:'')},{h:'Mon.',f:r=>r.moneda},{h:'Saldo',n:1,f:r=>`<span class="${sign(r.saldo)}">${fmt(r.saldo,r.moneda)}</span>`}], D.saldos.filter(s=>s.activa),'Cargá tus cuentas en Bancos')}
+    </div>
+    <div class="card"><h3>Vencimientos pendientes (próx. 30 días y vencidos)</h3>
+      ${venc.length? `<ul class="list">${venc.map(d=>`<li><span>${d.vencimiento<today()?'<span class="tag bad">Vencido</span> ':''}${esc(d.entidad==='cliente'?d.clientes?.nombre:d.proveedores?.nombre)} <span class="muted">· ${d.entidad==='cliente'?'cobrar':'pagar'} ${esc(d.numero||'')}</span></span><span class="n">${fdate(d.vencimiento)} · ${fmt(d.monto,d.moneda)}</span></li>`).join('')}</ul>`:'<div class="empty">Nada por vencer</div>'}
+    </div>
+    <div class="card"><h3>Próximos pasos comerciales</h3>
+      ${next.length? `<ul class="list">${next.map(o=>`<li><span><b>${esc(o.empresa)}</b> <span class="muted">· ${esc(o.proximo_paso||'')}</span></span><span class="n ${o.fecha_proximo<today()?'neg':''}">${fdate(o.fecha_proximo)}</span></li>`).join('')}</ul>`:'<div class="empty">Sin próximos pasos agendados</div>'}
+    </div>
+    <div class="card"><h3>Stock bajo mínimo</h3>
+      ${low.length? `<ul class="list">${low.map(p=>`<li><span>${esc(p.sku)} <span class="muted">· ${esc(p.nombre)}</span></span><span class="n neg">${p.stock} / mín ${p.stock_minimo}</span></li>`).join('')}</ul>`:'<div class="empty">Todo el stock está por encima del mínimo</div>'}
+    </div>
+  </div>`;
+}
+AFTER.resumen = ()=>{
+  const weeks=[]; const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7));
+  for(let i=11;i>=0;i--){ const s=new Date(d); s.setDate(d.getDate()-7*i); weeks.push(s.toISOString().slice(0,10)); }
+  const inc=weeks.map(()=>0), out=weeks.map(()=>0);
+  S.data.movs.forEach(m=>{
+    let idx=-1; for(let i=weeks.length-1;i>=0;i--){ if(m.fecha>=weeks[i]){ idx=i; break; } }
+    if(idx<0) return; const v=toUSD(m.monto, m.cuentas?.moneda);
+    if(m.tipo==='ingreso') inc[idx]+=v; else if(m.tipo==='pago') out[idx]+=v;
+  });
+  const cs=getComputedStyle(document.documentElement);
+  const c=new Chart($('#chWeeks'),{type:'bar',data:{labels:weeks.map(w=>fdate(w).slice(0,5)),datasets:[
+    {label:'Ingresos',data:inc,backgroundColor:cs.getPropertyValue('--s1').trim(),borderRadius:4,maxBarThickness:18},
+    {label:'Pagos',data:out,backgroundColor:cs.getPropertyValue('--s2').trim(),borderRadius:4,maxBarThickness:18}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>`${x.dataset.label}: ${fmt0(x.raw,'USD')}`}}},
+      scales:{x:{grid:{display:false},ticks:{color:cs.getPropertyValue('--muted').trim()}},y:{grid:{color:cs.getPropertyValue('--border').trim()},border:{display:false},ticks:{color:cs.getPropertyValue('--muted').trim(),callback:v=>fmt0(v)}}}}});
+  charts.push(c);
+};
+
+// ================= Bancos =================
+function vBancos(){
+  const D=S.data;
+  return `<div class="row between"><div><h2>Cuentas bancarias y caja</h2><p class="sub">Saldo = saldo inicial + movimientos desde la fecha del saldo inicial</p></div>
+    <div class="row"><button class="btn" onclick="openTransfer()">⇄ Transferencia</button><button class="btn pri" onclick="openForm('cuentas')">+ Cuenta</button></div></div>
+  <div class="card">${table([
+    {h:'Cuenta',f:r=>esc(r.nombre)},{h:'Banco',f:r=>esc(r.banco||'')},{h:'Moneda',f:r=>r.moneda},{h:'Tipo',f:r=>r.tipo},
+    {h:'Saldo inicial',n:1,f:r=>{const c=D.cuentas.find(x=>x.id===r.id);return fmt(c?.saldo_inicial,r.moneda)+` <span class="muted">${fdate(c?.fecha_saldo_inicial)}</span>`}},
+    {h:'Saldo actual',n:1,f:r=>`<b class="${sign(r.saldo)}">${fmt(r.saldo,r.moneda)}</b>`},
+    {h:'Últ. mov.',f:r=>fdate(r.ultimo_mov)},{h:'',f:r=>(r.activa?'':'<span class="tag">inactiva</span> ')+actions('cuentas',r.id)}],
+    D.saldos,'Todavía no hay cuentas. Creá, por ejemplo, "BROU Pesos" y "BROU Dólares".')}</div>`;
+}
+
+// ================= Movimientos =================
+const MF = { q:'', tipo:'', cuenta:'', desde:'', hasta:'' };
+const TIPO_LBL = {ingreso:'Ingreso',pago:'Pago',aporte:'Aporte socio',retiro:'Retiro socio',transferencia_in:'Transf. entrada',transferencia_out:'Transf. salida'};
+function vMovimientos(){
+  const D=S.data; const q=MF.q.toLowerCase();
+  const rows=D.movs.filter(m=>(!MF.tipo||m.tipo===MF.tipo)&&(!MF.cuenta||m.cuenta_id==MF.cuenta)&&(!MF.desde||m.fecha>=MF.desde)&&(!MF.hasta||m.fecha<=MF.hasta)&&
+    (!q||[m.descripcion,m.categoria,m.comprobante,m.clientes?.nombre,m.proveedores?.nombre,m.socios?.nombre].join(' ').toLowerCase().includes(q)));
+  const tot={UYU:0,USD:0}; rows.forEach(m=>{const s=['ingreso','aporte','transferencia_in'].includes(m.tipo)?1:-1; tot[m.cuentas?.moneda]+=s*m.monto;});
+  return `<div class="row between"><div><h2>Movimientos de caja y banco</h2><p class="sub">Ingresos, pagos, aportes y retiros. Un ingreso con cliente descuenta su cuenta corriente; un pago con proveedor descuenta la deuda.</p></div>
+    <div class="row"><button class="btn" onclick="exportXLSX('movimientos')">Exportar</button><button class="btn pri" onclick="openForm('movimientos')">+ Movimiento</button></div></div>
+  <div class="card">
+    <div class="row noprint" style="margin-bottom:12px">
+      <input placeholder="Buscar…" value="${esc(MF.q)}" oninput="MF.q=this.value;debRender()" style="min-width:200px">
+      <select onchange="MF.tipo=this.value;render()"><option value="">Todos los tipos</option>${Object.entries(TIPO_LBL).map(([k,l])=>`<option value="${k}" ${MF.tipo===k?'selected':''}>${l}</option>`).join('')}</select>
+      <select onchange="MF.cuenta=this.value;render()"><option value="">Todas las cuentas</option>${D.cuentas.map(c=>`<option value="${c.id}" ${MF.cuenta==c.id?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select>
+      <input type="date" value="${MF.desde}" onchange="MF.desde=this.value;render()"> a <input type="date" value="${MF.hasta}" onchange="MF.hasta=this.value;render()">
+      <span class="muted">${rows.length} mov. · neto ${fmt(tot.UYU,'UYU')} · ${fmt(tot.USD,'USD')}</span>
+    </div>
+    ${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Tipo',f:r=>`<span class="tag ${['ingreso','aporte','transferencia_in'].includes(r.tipo)?'good':'bad'}">${TIPO_LBL[r.tipo]}</span>`},
+      {h:'Cuenta',f:r=>esc(r.cuentas?.nombre)},{h:'Categoría',f:r=>esc(r.categoria||'')},
+      {h:'Cliente / Proveedor / Socio',f:r=>esc(r.clientes?.nombre||r.proveedores?.nombre||r.socios?.nombre||'')},
+      {h:'Descripción',f:r=>esc(r.descripcion||'')+(r.comprobante?` <span class="muted">#${esc(r.comprobante)}</span>`:'')},
+      {h:'Monto',n:1,f:r=>`<span class="${['ingreso','aporte','transferencia_in'].includes(r.tipo)?'pos':'neg'}">${fmt(r.monto,r.cuentas?.moneda)}</span>`},
+      {h:'',f:r=>actions('movimientos',r.id)}], rows.slice(0,500))}
+    ${rows.length>500?'<p class="muted">Mostrando 500 de '+rows.length+'. Usá los filtros o exportá.</p>':''}
+  </div>`;
+}
+let _deb; function debRender(){ clearTimeout(_deb); _deb=setTimeout(()=>{ const a=document.activeElement, pos=a?.selectionStart; render(); const i=$('#main input'); if(i){i.focus(); try{i.setSelectionRange(pos,pos)}catch(e){}} },250); }
+
+// ================= Cta cte =================
+function ccView(kind){
+  const D=S.data, isC=kind==='cliente'; const rows=isC?D.ccc:D.ccp; const key=isC?'cliente_id':'proveedor_id';
+  const tot={UYU:0,USD:0}; rows.forEach(r=>tot[r.moneda]+=Number(r.saldo));
+  const docs=D.docs.filter(d=>d.entidad===kind);
+  return `<div class="row between"><div><h2>${isC?'Cuenta corriente de clientes':'Deuda con proveedores'}</h2>
+    <p class="sub">${isC?'Facturas y saldos iniciales menos cobros (ingresos con cliente asignado)':'Facturas de compra y saldos iniciales menos pagos (pagos con proveedor asignado)'}</p></div>
+    <div class="row"><button class="btn" onclick="openForm('${isC?'clientes':'proveedores'}')">+ ${isC?'Cliente':'Proveedor'}</button>
+    <button class="btn" onclick="openForm('movimientos',null,{tipo:'${isC?'ingreso':'pago'}'})">+ ${isC?'Cobro':'Pago'}</button>
+    <button class="btn pri" onclick="openForm('documentos',null,{entidad:'${kind}'})">+ Factura / saldo</button></div></div>
+  <div class="grid kpis" style="margin-bottom:14px">
+    <div class="card kpi"><div class="l">Saldo en pesos</div><div class="v">${fmt0(tot.UYU,'UYU')}</div></div>
+    <div class="card kpi"><div class="l">Saldo en dólares</div><div class="v">${fmt0(tot.USD,'USD')}</div></div>
+    <div class="card kpi"><div class="l">Total USD eq.</div><div class="v">${fmt0(tot.USD+toUSD(tot.UYU,'UYU'),'USD')}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px"><h3>Saldos</h3>${table([
+    {h:isC?'Cliente':'Proveedor',f:r=>`<a href="#" onclick="ccDetail('${kind}',${r[key]});return false">${esc(r.nombre)}</a>`},{h:'Moneda',f:r=>r.moneda},
+    {h:'Facturado',n:1,f:r=>fmt(r.facturado,r.moneda)},{h:isC?'Cobrado':'Pagado',n:1,f:r=>fmt(isC?r.cobrado:r.pagado,r.moneda)},
+    {h:'Saldo',n:1,f:r=>`<b class="${r.saldo>0.004?(isC?'':'neg'):''}">${fmt(r.saldo,r.moneda)}</b>`},
+    {h:'Próx. venc.',f:r=>r.prox_venc?`<span class="${r.prox_venc<today()&&r.saldo>0?'neg':''}">${fdate(r.prox_venc)}</span>`:''}],
+    rows.filter(r=>Math.abs(r.saldo)>0.004).sort((a,b)=>toUSD(b.saldo,b.moneda)-toUSD(a.saldo,a.moneda)),'Sin saldos pendientes')}</div>
+  <div class="card"><h3>Documentos cargados</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:isC?'Cliente':'Proveedor',f:r=>esc(isC?r.clientes?.nombre:r.proveedores?.nombre)},
+    {h:'Tipo',f:r=>r.tipo.replace('_',' ')},{h:'Número',f:r=>esc(r.numero||'')},{h:'Vence',f:r=>fdate(r.vencimiento)},{h:'Descripción',f:r=>esc(r.descripcion||'')},
+    {h:'Monto',n:1,f:r=>(r.tipo==='nota_credito'?'−':'')+fmt(r.monto,r.moneda)},{h:'',f:r=>actions('documentos',r.id)}], docs.slice(0,300))}</div>`;
+}
+const vClientes=()=>ccView('cliente'), vProveedores=()=>ccView('proveedor');
+function ccDetail(kind,id){
+  const D=S.data, isC=kind==='cliente', key=isC?'cliente_id':'proveedor_id';
+  const ent=(isC?D.clientes:D.proveedores).find(x=>x.id===id);
+  const lines=[...D.docs.filter(d=>d.entidad===kind&&d[key]===id).map(d=>({fecha:d.fecha,det:d.tipo.replace('_',' ')+' '+(d.numero||''),mon:d.moneda,debe:d.tipo==='nota_credito'?0:+d.monto,haber:d.tipo==='nota_credito'?+d.monto:0})),
+    ...D.movs.filter(m=>m[key]===id&&m.tipo===(isC?'ingreso':'pago')).map(m=>({fecha:m.fecha,det:(isC?'Cobro':'Pago')+' · '+(m.cuentas?.nombre||'')+(m.comprobante?' #'+m.comprobante:''),mon:m.cuentas?.moneda,debe:0,haber:+m.monto}))]
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const run={UYU:0,USD:0}; lines.forEach(l=>{run[l.mon]+=l.debe-l.haber; l.saldo=run[l.mon];});
+  modal(`<div class="row between"><h2>${esc(ent?.nombre)}</h2><button class="btn sm" onclick="closeModal()">Cerrar</button></div>
+    <p class="sub">${esc([ent?.rut,ent?.contacto,ent?.telefono,ent?.email].filter(Boolean).join(' · '))}</p>
+    ${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Detalle',f:r=>esc(r.det)},{h:'Mon.',f:r=>r.mon},{h:'Debe',n:1,f:r=>r.debe?fmt(r.debe):''},{h:'Haber',n:1,f:r=>r.haber?fmt(r.haber):''},{h:'Saldo',n:1,f:r=>fmt(r.saldo)}],lines)}
+    <p><b>Saldo:</b> ${fmt(run.UYU,'UYU')} · ${fmt(run.USD,'USD')}</p>`, 820);
+}
+
+// ================= Stock =================
+const SF={q:''};
+function vStock(){
+  const D=S.data; const q=SF.q.toLowerCase();
+  const rows=D.vstock.filter(p=>!q||(p.sku+' '+p.nombre+' '+(p.categoria||'')).toLowerCase().includes(q));
+  const val=rows.reduce((a,p)=>a+toUSD(Math.max(0,p.stock)*Number(p.costo||0),p.moneda_costo),0);
+  return `<div class="row between"><div><h2>Stock e inventario</h2><p class="sub">Stock = entradas − salidas ± ajustes. Valorizado a costo.</p></div>
+    <div class="row"><button class="btn" onclick="exportXLSX('stock')">Exportar</button><button class="btn" onclick="openForm('productos')">+ Producto</button><button class="btn pri" onclick="openForm('stock_movimientos')">+ Entrada / salida</button></div></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="row noprint" style="margin-bottom:12px"><input placeholder="Buscar SKU, nombre, categoría…" value="${esc(SF.q)}" oninput="SF.q=this.value;debRender()" style="min-width:260px"><span class="muted">${rows.length} productos · valor ${fmt0(val,'USD')}</span></div>
+    ${table([{h:'SKU',f:r=>esc(r.sku)},{h:'Producto',f:r=>esc(r.nombre)},{h:'Categoría',f:r=>esc(r.categoria||'')},
+      {h:'Stock',n:1,f:r=>`<b class="${Number(r.stock)<Number(r.stock_minimo||0)?'neg':''}">${Number(r.stock)}</b> <span class="muted">${esc(r.unidad||'')}</span>`},
+      {h:'Mín.',n:1,f:r=>r.stock_minimo||0},{h:'Costo',n:1,f:r=>fmt(r.costo,r.moneda_costo)},{h:'Valor',n:1,f:r=>fmt(Math.max(0,r.stock)*r.costo,r.moneda_costo)},
+      {h:'Últ. mov.',f:r=>fdate(r.ultimo_mov)},{h:'',f:r=>actions('productos',r.id)}], rows,'Cargá productos o importalos desde Excel')}
+  </div>
+  <div class="card"><h3>Últimos movimientos de stock</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='entrada'?'good':r.tipo==='salida'?'bad':''}">${r.tipo}</span>`},
+    {h:'Producto',f:r=>esc((r.productos?.sku||'')+' · '+(r.productos?.nombre||''))},{h:'Cant.',n:1,f:r=>r.cantidad},{h:'Costo u.',n:1,f:r=>r.costo_unitario?fmt(r.costo_unitario):''},
+    {h:'Referencia',f:r=>esc(r.referencia||'')},{h:'',f:r=>actions('stock_movimientos',r.id)}], D.smov.slice(0,200))}</div>`;
+}
+
+// ================= Oportunidades =================
+const ETAPAS=[['prospecto','Prospecto'],['contactado','Contactado'],['cotizado','Cotizado'],['negociacion','Negociación'],['ganada','Ganada'],['perdida','Perdida']];
+function vOpps(){
+  const D=S.data;
+  return `<div class="row between"><div><h2>Oportunidades y posibles clientes</h2><p class="sub">Seguimiento de negociaciones. Clic en una tarjeta para editar.</p></div>
+    <div class="row"><button class="btn" onclick="exportXLSX('oportunidades')">Exportar</button><button class="btn pri" onclick="openForm('oportunidades')">+ Oportunidad</button></div></div>
+  <div class="kanban">${ETAPAS.map(([k,l])=>{ const os=D.opps.filter(o=>o.etapa===k); const t=os.reduce((a,o)=>a+toUSD(o.monto_estimado,o.moneda),0);
+    return `<div class="kcol"><h4><span>${l} · ${os.length}</span><span>${fmt0(t,'USD')}</span></h4>${os.map(o=>`<div class="kc" onclick="openForm('oportunidades',${o.id})">
+      <b>${esc(o.empresa)}</b><span class="muted">${esc(o.producto||'')}${o.monto_estimado?' · '+fmt0(o.monto_estimado,o.moneda):''}</span>
+      ${o.proximo_paso?`<div style="margin-top:4px;font-size:12px">→ ${esc(o.proximo_paso)} ${o.fecha_proximo?`<span class="${o.fecha_proximo<today()?'neg':'muted'}">${fdate(o.fecha_proximo)}</span>`:''}</div>`:''}
+      ${o.responsable?`<div class="muted" style="font-size:11px;margin-top:2px">${esc(o.responsable)} · ${o.probabilidad||0}%</div>`:''}</div>`).join('')}</div>`; }).join('')}</div>`;
+}
+
+// ================= Socios =================
+function vSocios(){
+  const D=S.data;
+  const agg={}; D.vsocios.forEach(r=>{ agg[r.id]=agg[r.id]||{UYU:{a:0,r:0},USD:{a:0,r:0}}; if(r.moneda){agg[r.id][r.moneda].a+=+r.aportes; agg[r.id][r.moneda].r+=+r.retiros;} });
+  const movs=D.movs.filter(m=>m.tipo==='aporte'||m.tipo==='retiro');
+  return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Solo los socios activos con email pueden entrar al sistema.</p></div>
+    <div class="row"><button class="btn" onclick="openForm('movimientos',null,{tipo:'aporte'})">+ Aporte</button><button class="btn" onclick="openForm('movimientos',null,{tipo:'retiro'})">+ Retiro</button><button class="btn pri" onclick="openForm('socios')">+ Socio</button></div></div>
+  <div class="card" style="margin-bottom:14px">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'%',n:1,f:r=>r.participacion??''},
+    {h:'Aportes $',n:1,f:r=>fmt(agg[r.id]?.UYU.a)},{h:'Retiros $',n:1,f:r=>fmt(agg[r.id]?.UYU.r)},{h:'Aportes US$',n:1,f:r=>fmt(agg[r.id]?.USD.a)},{h:'Retiros US$',n:1,f:r=>fmt(agg[r.id]?.USD.r)},
+    {h:'Neto US$ eq.',n:1,f:r=>{const g=agg[r.id]; if(!g) return fmt(0); const n=g.USD.a-g.USD.r+toUSD(g.UYU.a-g.UYU.r,'UYU'); return `<b class="${sign(n)}">${fmt(n)}</b>`}},
+    {h:'',f:r=>actions('socios',r.id)}], D.socios)}</div>
+  <div class="card"><h3>Detalle de aportes y retiros</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Socio',f:r=>esc(r.socios?.nombre||'—')},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='aporte'?'good':'warn'}">${TIPO_LBL[r.tipo]}</span>`},
+    {h:'Cuenta',f:r=>esc(r.cuentas?.nombre)},{h:'Descripción',f:r=>esc(r.descripcion||'')},{h:'Monto',n:1,f:r=>fmt(r.monto,r.cuentas?.moneda)},{h:'',f:r=>actions('movimientos',r.id)}], movs)}</div>`;
+}
+
+// ================= Config =================
+function vConfig(){
+  const D=S.data;
+  return `<h2>Configuración</h2><p class="sub">Tipo de cambio, clientes y proveedores.</p>
+  <div class="grid two">
+    <div class="card"><div class="row between"><h3>Tipo de cambio USD → UYU</h3><button class="btn sm pri" onclick="openForm('tipo_cambio')">+ TC</button></div>
+      ${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'USD/UYU',n:1,f:r=>r.usd_uyu},{h:'',f:r=>`<button class="btn sm ghost danger" onclick="delRow('tipo_cambio','${r.fecha}','fecha')">✕</button>`}], D.tc.slice(0,20))}</div>
+    <div class="card"><div class="row between"><h3>Clientes</h3><button class="btn sm pri" onclick="openForm('clientes')">+ Cliente</button></div>
+      ${table([{h:'Nombre',f:r=>esc(r.nombre)},{h:'RUT',f:r=>esc(r.rut||'')},{h:'Contacto',f:r=>esc([r.contacto,r.telefono].filter(Boolean).join(' · '))},{h:'',f:r=>actions('clientes',r.id)}], D.clientes)}</div>
+    <div class="card"><div class="row between"><h3>Proveedores</h3><button class="btn sm pri" onclick="openForm('proveedores')">+ Proveedor</button></div>
+      ${table([{h:'Nombre',f:r=>esc(r.nombre)},{h:'RUT',f:r=>esc(r.rut||'')},{h:'Contacto',f:r=>esc([r.contacto,r.telefono].filter(Boolean).join(' · '))},{h:'',f:r=>actions('proveedores',r.id)}], D.proveedores)}</div>
+  </div>`;
+}
+
+// ================= Forms =================
+const opt = (arr, lab='nombre') => arr.map(x=>[x.id, typeof lab==='function'?lab(x):x[lab]]);
+const FORMS = {
+  cuentas:{t:'Cuenta', f:()=>[['nombre','Nombre','text',1],['banco','Banco','text'],['moneda','Moneda','sel',1,[['UYU','Pesos (UYU)'],['USD','Dólares (USD)']]],
+    ['tipo','Tipo','sel',1,[['banco','Banco'],['caja','Caja'],['otro','Otro']]],['saldo_inicial','Saldo inicial','num'],['fecha_saldo_inicial','Fecha del saldo inicial','date'],['activa','Activa','bool']]},
+  movimientos:{t:'Movimiento', f:()=>[['fecha','Fecha','date',1],['tipo','Tipo','sel',1,Object.entries(TIPO_LBL).filter(([k])=>!k.startsWith('transf'))],
+    ['cuenta_id','Cuenta','sel',1,opt(S.data.cuentas,c=>`${c.nombre} (${c.moneda})`)],['monto','Monto','num',1],
+    ['categoria','Categoría','list',0,['Ventas','Cobro cliente','Proveedores','Importación','Sueldos','Impuestos','Alquiler','Servicios','Comisiones bancarias','Fletes','Otros']],
+    ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],['socio_id','Socio','sel',0,opt(S.data.socios)],
+    ['comprobante','Comprobante','text'],['descripcion','Descripción','text',0,null,1]]},
+  documentos:{t:'Factura / documento de cta. cte.', f:()=>[['entidad','Tipo de cuenta','sel',1,[['cliente','Cliente (nos debe)'],['proveedor','Proveedor (le debemos)']]],
+    ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],
+    ['tipo','Documento','sel',1,[['factura','Factura'],['saldo_inicial','Saldo inicial'],['nota_credito','Nota de crédito'],['ajuste','Ajuste']]],
+    ['numero','Número','text'],['moneda','Moneda','sel',1,[['USD','USD'],['UYU','UYU']]],['monto','Monto','num',1],['fecha','Fecha','date',1],['vencimiento','Vencimiento','date'],['descripcion','Descripción','text',0,null,1]]},
+  clientes:{t:'Cliente', f:()=>[['nombre','Nombre / razón social','text',1,null,1],['rut','RUT','text'],['contacto','Contacto','text'],['telefono','Teléfono','text'],['email','Email','text'],['notas','Notas','area']]},
+  proveedores:{t:'Proveedor', f:()=>FORMS.clientes.f()},
+  productos:{t:'Producto', f:()=>[['sku','SKU / código','text',1],['nombre','Nombre','text',1],['categoria','Categoría','list',0,['Help IP','Telefonía IP','Voceo','Porteros IP','Control de acceso','TimbreQR','Accesorios']],
+    ['unidad','Unidad','text'],['costo','Costo unitario','num'],['moneda_costo','Moneda costo','sel',1,[['USD','USD'],['UYU','UYU']]],['stock_minimo','Stock mínimo','num'],['activo','Activo','bool']]},
+  stock_movimientos:{t:'Movimiento de stock', f:()=>[['fecha','Fecha','date',1],['tipo','Tipo','sel',1,[['entrada','Entrada (compra/ingreso)'],['salida','Salida (venta/entrega)'],['ajuste','Ajuste (+/−)']]],
+    ['producto_id','Producto','sel',1,opt(S.data.productos,p=>`${p.sku} · ${p.nombre}`)],['cantidad','Cantidad','num',1],['costo_unitario','Costo unitario','num'],
+    ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],['referencia','Referencia (factura, remito…)','text',0,null,1]]},
+  oportunidades:{t:'Oportunidad', f:()=>[['empresa','Empresa / institución','text',1,null,1],['contacto','Contacto','text'],['telefono','Teléfono','text'],['email','Email','text'],
+    ['producto','Producto / solución','list',0,['Help IP','Telefonía IP','Voceo / WAN Page','Portero IP','Control de acceso','TimbreQR','Software salud']],
+    ['monto_estimado','Monto estimado','num'],['moneda','Moneda','sel',0,[['USD','USD'],['UYU','UYU']]],['etapa','Etapa','sel',1,ETAPAS],['probabilidad','Probabilidad %','num'],
+    ['responsable','Responsable','list',0,S.data.socios.map(s=>s.nombre)],['fecha_proximo','Fecha próximo paso','date'],['proximo_paso','Próximo paso','text',0,null,1],['notas','Notas','area']]},
+  socios:{t:'Socio', f:()=>[['nombre','Nombre','text',1],['email','Email (para ingresar)','text'],['participacion','Participación %','num'],['activo','Activo','bool']]},
+  tipo_cambio:{t:'Tipo de cambio', pk:'fecha', f:()=>[['fecha','Fecha','date',1],['usd_uyu','1 USD = UYU','num',1]]},
+};
+const TBL_DATA = {cuentas:'cuentas',movimientos:'movs',documentos:'docs',clientes:'clientes',proveedores:'proveedores',productos:'productos',stock_movimientos:'smov',oportunidades:'opps',socios:'socios',tipo_cambio:'tc'};
+
+function modal(html, w=620){ $('#modalRoot').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:${w}px">${html}</div></div>`; }
+function closeModal(){ $('#modalRoot').innerHTML=''; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+function openForm(tbl, id=null, preset={}){
+  const F=FORMS[tbl]; const pk=F.pk||'id';
+  const rec = id!=null ? (S.data[TBL_DATA[tbl]]||[]).find(r=>r[pk]==id) : {fecha:today(), fecha_saldo_inicial:today(), activa:true, activo:true, moneda:'USD', moneda_costo:'USD', etapa:'prospecto', probabilidad:20, tipo: tbl==='cuentas'?'banco':undefined, ...preset};
+  const fields=F.f();
+  const input=([k,l,t,req,opts,full])=>{
+    const v=rec?.[k]; const r=req?'required':'';
+    let h;
+    if(t==='sel') h=`<select name="${k}" ${r}><option value="">${req?'Elegir…':'—'}</option>${(opts||[]).map(([ov,ol])=>`<option value="${esc(ov)}" ${String(v)===String(ov)?'selected':''}>${esc(ol)}</option>`).join('')}</select>`;
+    else if(t==='list') h=`<input name="${k}" list="dl_${k}" value="${esc(v??'')}"><datalist id="dl_${k}">${(opts||[]).map(o=>`<option value="${esc(o)}">`).join('')}</datalist>`;
+    else if(t==='bool') h=`<select name="${k}"><option value="true" ${v!==false?'selected':''}>Sí</option><option value="false" ${v===false?'selected':''}>No</option></select>`;
+    else if(t==='area') h=`<textarea name="${k}" rows="3">${esc(v??'')}</textarea>`;
+    else h=`<input name="${k}" type="${t==='num'?'number':t==='date'?'date':'text'}" ${t==='num'?'step="any"':''} value="${esc(v??'')}" ${r}>`;
+    return `<label class="f ${full||t==='area'?'full':''}" data-k="${k}">${l}${req?' *':''}${h}</label>`;
+  };
+  modal(`<h2>${id!=null?'Editar':'Nuevo'}: ${F.t}</h2><p class="sub">&nbsp;</p>
+    <form id="frm" class="fgrid">${fields.map(input).join('')}
+    <div class="full row between" style="margin-top:6px"><span class="muted" id="frmMsg"></span><div class="row"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
+  const frm=$('#frm');
+  const toggle=()=>{ // mostrar/ocultar campos según contexto
+    if(tbl==='movimientos'){ const t=frm.tipo.value; vis('cliente_id',t==='ingreso'); vis('proveedor_id',t==='pago'); vis('socio_id',t==='aporte'||t==='retiro'); }
+    if(tbl==='documentos'){ const e=frm.entidad.value; vis('cliente_id',e==='cliente'); vis('proveedor_id',e==='proveedor'); }
+    if(tbl==='stock_movimientos'){ const t=frm.tipo.value; vis('cliente_id',t==='salida'); vis('proveedor_id',t==='entrada'); }
+  };
+  const vis=(k,on)=>{ const el=frm.querySelector(`[data-k="${k}"]`); if(el){ el.classList.toggle('hidden',!on); if(!on) el.querySelector('select,input').value=''; } };
+  frm.addEventListener('change',toggle); toggle();
+  frm.onsubmit=async e=>{
+    e.preventDefault(); const row={};
+    fields.forEach(([k,,t])=>{ let v=frm[k].value; if(v===''){ row[k]=null; return; } if(t==='num') v=Number(v); if(t==='bool') v=v==='true'; if(t==='sel'&&/_id$/.test(k)) v=Number(v); row[k]=v; });
+    if(tbl==='documentos' && !(row.cliente_id||row.proveedor_id)){ $('#frmMsg').textContent='Elegí el cliente o proveedor.'; return; }
+    if(tbl==='oportunidades') row.actualizado=new Date().toISOString();
+    const q = id!=null ? sb.from(tbl).update(row).eq(pk,id) : (tbl==='tipo_cambio'? sb.from(tbl).upsert(row) : sb.from(tbl).insert(row));
+    const {error}=await q; if(error){ $('#frmMsg').textContent=error.message; return; }
+    closeModal(); toast('Guardado'); refresh();
+  };
+}
+async function delRow(tbl,id,pk='id'){
+  if(!confirm('¿Eliminar este registro?')) return;
+  const {error}=await sb.from(tbl).delete().eq(pk,id);
+  if(error) toast(error.message.includes('foreign key')?'No se puede borrar: tiene movimientos asociados.':error.message,5000); else { toast('Eliminado'); refresh(); }
+}
+function openTransfer(){
+  const cs=S.data.cuentas; const o=cs.map(c=>`<option value="${c.id}">${esc(c.nombre)} (${c.moneda})</option>`).join('');
+  modal(`<h2>Transferencia entre cuentas</h2><p class="sub">Si las monedas difieren, indicá el monto que entra en destino (compra/venta de dólares).</p>
+  <form id="tf" class="fgrid"><label class="f">Desde<select name="a" required>${o}</select></label><label class="f">Hacia<select name="b" required>${o}</select></label>
+  <label class="f">Monto que sale<input name="m1" type="number" step="any" required></label><label class="f">Monto que entra<input name="m2" type="number" step="any" placeholder="igual si misma moneda"></label>
+  <label class="f">Fecha<input name="f" type="date" value="${today()}" required></label><label class="f">Descripción<input name="d"></label>
+  <div class="full row between"><span class="muted" id="tfMsg"></span><div class="row"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
+  $('#tf').onsubmit=async e=>{ e.preventDefault(); const f=e.target; if(f.a.value===f.b.value){ $('#tfMsg').textContent='Elegí cuentas distintas'; return; }
+    const ref=crypto.randomUUID(); const m1=+f.m1.value, m2=f.m2.value?+f.m2.value:m1;
+    const {error}=await sb.from('movimientos').insert([
+      {fecha:f.f.value,cuenta_id:+f.a.value,tipo:'transferencia_out',monto:m1,categoria:'Transferencia',descripcion:f.d.value||null,transferencia_ref:ref},
+      {fecha:f.f.value,cuenta_id:+f.b.value,tipo:'transferencia_in',monto:m2,categoria:'Transferencia',descripcion:f.d.value||null,transferencia_ref:ref}]);
+    if(error){ $('#tfMsg').textContent=error.message; return; } closeModal(); toast('Transferencia registrada'); refresh(); };
+}
+
+// ================= Import / Export =================
+const IMPORTS = {
+  movimientos:{l:'Movimientos (ingresos, pagos, aportes, retiros)', cols:['fecha','cuenta','tipo','monto','categoria','descripcion','comprobante','cliente','proveedor','socio'],
+    ex:[['2026-09-22','BROU Pesos','ingreso',15000,'Cobro cliente','Cobro factura 123','A-123','Hospital de Clínicas','',''],['2026-09-23','BROU Dólares','pago',850,'Proveedores','Pago importación','','','Surix Argentina',''],['2026-09-24','BROU Dólares','aporte',2000,'','Aporte capital','','','','Mariano Porreca']]},
+  documentos:{l:'Facturas / saldos de cta. cte. (clientes y proveedores)', cols:['fecha','vencimiento','entidad','nombre','tipo','numero','moneda','monto','descripcion'],
+    ex:[['2026-09-01','2026-10-01','cliente','Hospital de Clínicas','factura','A-123','USD',3200,'Help IP etapa 1'],['2026-09-01','','proveedor','Surix Argentina','saldo_inicial','','USD',5400,'Saldo al 01/09']]},
+  productos:{l:'Productos (catálogo)', cols:['sku','nombre','categoria','unidad','costo','moneda_costo','stock_minimo'], ex:[['HIP-100','Pulsador cama Help IP','Help IP','un',45,'USD',10]]},
+  stock:{l:'Movimientos de stock (entradas / salidas / stock inicial)', cols:['fecha','sku','tipo','cantidad','costo_unitario','referencia'], ex:[['2026-09-01','HIP-100','entrada',50,45,'Stock inicial'],['2026-09-20','HIP-100','salida',6,'','Remito 0012']]},
+  clientes:{l:'Clientes', cols:['nombre','rut','contacto','telefono','email','notas'], ex:[['Hospital de Clínicas','','','','','']]},
+  proveedores:{l:'Proveedores', cols:['nombre','rut','contacto','telefono','email','notas'], ex:[['Surix Argentina','','','','','']]},
+  oportunidades:{l:'Oportunidades', cols:['empresa','contacto','telefono','email','producto','monto_estimado','moneda','etapa','probabilidad','responsable','proximo_paso','fecha_proximo','notas'],
+    ex:[['Clínica Ejemplo','Dra. Pérez','','','Help IP',12000,'USD','cotizado',40,'Mariano','Llamar para cerrar','2026-10-02','']]},
+  tipo_cambio:{l:'Tipo de cambio', cols:['fecha','usd_uyu'], ex:[['2026-09-26',40.1]]},
+};
+const IMP={type:'movimientos', rows:null, errors:[], ready:[]};
+function vImportar(){
+  return `<h2>Importar desde Excel</h2><p class="sub">Bajá la plantilla, pegá tus datos respetando los encabezados y subila. Se validan antes de guardar. Clientes y proveedores que no existan se crean solos; cuentas, socios y SKUs tienen que existir.</p>
+  <div class="card" style="margin-bottom:14px"><div class="row">
+    <select id="impType" onchange="IMP.type=this.value;IMP.rows=null;render()">${Object.entries(IMPORTS).map(([k,v])=>`<option value="${k}" ${IMP.type===k?'selected':''}>${v.l}</option>`).join('')}</select>
+    <button class="btn" onclick="downloadTemplate()">⬇ Plantilla Excel (todas las hojas)</button></div>
+    <p class="muted" style="margin:10px 0">Columnas: <code>${IMPORTS[IMP.type].cols.join(', ')}</code></p>
+    <label class="drop" id="drop">Arrastrá un .xlsx / .csv o hacé clic para elegir<input type="file" id="impFile" accept=".xlsx,.xls,.csv" class="hidden"></label>
+  </div>
+  ${IMP.rows? `<div class="card"><div class="row between"><h3>Vista previa · ${IMP.ready.length} filas válidas${IMP.errors.length?` · <span class="neg">${IMP.errors.length} con error</span>`:''}</h3>
+    <div class="row"><button class="btn" onclick="IMP.rows=null;render()">Cancelar</button><button class="btn pri" ${IMP.ready.length?'':'disabled'} onclick="doImport()">Importar ${IMP.ready.length} filas</button></div></div>
+    ${IMP.errors.length?`<ul class="neg" style="font-size:12px">${IMP.errors.slice(0,15).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>`:''}
+    ${table(IMPORTS[IMP.type].cols.map(c=>({h:c,f:r=>esc(r[c] instanceof Date?r[c].toISOString().slice(0,10):r[c]??'')})), IMP.rows.slice(0,50))}</div>`:''}`;
+}
+AFTER.importar=()=>{
+  const inp=$('#impFile'), dr=$('#drop');
+  inp.onchange=()=>inp.files[0]&&readFile(inp.files[0]);
+  dr.ondragover=e=>{e.preventDefault(); dr.style.borderColor='var(--brand)'}; dr.ondragleave=()=>dr.style.borderColor='';
+  dr.ondrop=e=>{e.preventDefault(); e.dataTransfer.files[0]&&readFile(e.dataTransfer.files[0]);};
+};
+const norm = s => String(s??'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+function parseNum(v){ if(v===''||v==null) return null; if(typeof v==='number') return v; let s=String(v).replace(/[^\d,.\-]/g,'');
+  if(s.includes(',')&&s.includes('.')) s = s.lastIndexOf(',')>s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  else if(s.includes(',')) s=s.replace(',','.'); const n=Number(s); return isNaN(n)?NaN:n; }
+function parseDate(v){ if(!v) return null; if(v instanceof Date) return new Date(v.getTime()-v.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const s=String(v).trim(); let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); if(m){ const y=m[3].length===2?'20'+m[3]:m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  return 'x'; }
+async function readFile(file){
+  const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  const want=norm(IMP.type); const sh=wb.SheetNames.find(n=>norm(n)===want)||wb.SheetNames[0];
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[sh],{defval:''});
+  IMP.rows=raw.map(r=>{ const o={}; Object.entries(r).forEach(([k,v])=>o[norm(k)]=v); return o; }).filter(r=>Object.values(r).some(v=>v!==''&&v!=null));
+  validateImport(); render(); toast(`Hoja "${sh}": ${IMP.rows.length} filas`);
+}
+const findBy=(arr,k,v)=>arr.find(x=>norm(x[k])===norm(v));
+function validateImport(){
+  const T=IMP.type, D=S.data; IMP.errors=[]; IMP.ready=[];
+  IMP.rows.forEach((r,i)=>{ const n=i+2, err=m=>IMP.errors.push(`Fila ${n}: ${m}`); let o;
+    try{
+    if(T==='movimientos'){
+      const c=findBy(D.cuentas,'nombre',r.cuenta); if(!c) return err(`cuenta "${r.cuenta}" no existe`);
+      const tipo=norm(r.tipo); if(!['ingreso','pago','aporte','retiro'].includes(tipo)) return err(`tipo "${r.tipo}" inválido (ingreso/pago/aporte/retiro)`);
+      const monto=parseNum(r.monto); if(!(monto>0)) return err('monto inválido');
+      const fecha=parseDate(r.fecha); if(!fecha||fecha==='x') return err('fecha inválida');
+      let socio_id=null; if(r.socio){ const s=findBy(D.socios,'nombre',r.socio); if(!s) return err(`socio "${r.socio}" no existe`); socio_id=s.id; }
+      o={fecha,cuenta_id:c.id,tipo,monto,categoria:r.categoria||null,descripcion:r.descripcion||null,comprobante:r.comprobante?String(r.comprobante):null,socio_id,_cliente:r.cliente||null,_proveedor:r.proveedor||null};
+    } else if(T==='documentos'){
+      const ent=norm(r.entidad); if(!['cliente','proveedor'].includes(ent)) return err('entidad debe ser cliente o proveedor');
+      if(!r.nombre) return err('falta nombre'); const tipo=norm(r.tipo)||'factura'; if(!['factura','nota_credito','saldo_inicial','ajuste'].includes(tipo)) return err(`tipo "${r.tipo}" inválido`);
+      const mon=String(r.moneda||'').toUpperCase().trim(); if(!['UYU','USD'].includes(mon)) return err('moneda debe ser UYU o USD');
+      const monto=parseNum(r.monto); if(monto==null||isNaN(monto)) return err('monto inválido');
+      const fecha=parseDate(r.fecha); if(!fecha||fecha==='x') return err('fecha inválida'); const venc=parseDate(r.vencimiento); if(venc==='x') return err('vencimiento inválido');
+      o={fecha,vencimiento:venc,entidad:ent,tipo,numero:r.numero?String(r.numero):null,moneda:mon,monto,descripcion:r.descripcion||null,[ent==='cliente'?'_cliente':'_proveedor']:r.nombre};
+    } else if(T==='productos'){
+      if(!r.sku||!r.nombre) return err('sku y nombre obligatorios');
+      o={sku:String(r.sku).trim(),nombre:r.nombre,categoria:r.categoria||null,unidad:r.unidad||'un',costo:parseNum(r.costo)||0,moneda_costo:String(r.moneda_costo||'USD').toUpperCase(),stock_minimo:parseNum(r.stock_minimo)||0};
+    } else if(T==='stock'){
+      const p=D.productos.find(x=>String(x.sku).trim().toLowerCase()===String(r.sku).trim().toLowerCase()); if(!p) return err(`SKU "${r.sku}" no existe (importá productos primero)`);
+      const tipo=norm(r.tipo); if(!['entrada','salida','ajuste'].includes(tipo)) return err('tipo debe ser entrada/salida/ajuste');
+      const cant=parseNum(r.cantidad); if(cant==null||isNaN(cant)) return err('cantidad inválida'); const fecha=parseDate(r.fecha)||today(); if(fecha==='x') return err('fecha inválida');
+      o={fecha,producto_id:p.id,tipo,cantidad:cant,costo_unitario:parseNum(r.costo_unitario),referencia:r.referencia?String(r.referencia):null};
+    } else if(T==='clientes'||T==='proveedores'){
+      if(!r.nombre) return err('falta nombre'); if(findBy(D[T],'nombre',r.nombre)) return err(`"${r.nombre}" ya existe (se omite)`);
+      o={nombre:String(r.nombre).trim(),rut:r.rut?String(r.rut):null,contacto:r.contacto||null,telefono:r.telefono?String(r.telefono):null,email:r.email||null,notas:r.notas||null};
+    } else if(T==='oportunidades'){
+      if(!r.empresa) return err('falta empresa'); const et=norm(r.etapa)||'prospecto'; if(!ETAPAS.some(([k])=>k===et)) return err(`etapa "${r.etapa}" inválida`);
+      const fp=parseDate(r.fecha_proximo); if(fp==='x') return err('fecha_proximo inválida');
+      o={empresa:r.empresa,contacto:r.contacto||null,telefono:r.telefono?String(r.telefono):null,email:r.email||null,producto:r.producto||null,monto_estimado:parseNum(r.monto_estimado),
+        moneda:String(r.moneda||'USD').toUpperCase(),etapa:et,probabilidad:parseNum(r.probabilidad)??20,responsable:r.responsable||null,proximo_paso:r.proximo_paso||null,fecha_proximo:fp,notas:r.notas||null};
+    } else if(T==='tipo_cambio'){
+      const f=parseDate(r.fecha), v=parseNum(r.usd_uyu); if(!f||f==='x'||!(v>0)) return err('fecha o valor inválido'); o={fecha:f,usd_uyu:v};
+    }
+    IMP.ready.push(o);
+    }catch(e){ err(e.message); }
+  });
+}
+async function ensureEntities(tbl, names){
+  const D=S.data; const miss=[...new Set(names.filter(Boolean).map(n=>String(n).trim()))].filter(n=>!findBy(D[tbl],'nombre',n));
+  if(miss.length){ const {data,error}=await sb.from(tbl).insert(miss.map(nombre=>({nombre}))).select(); if(error) throw error; D[tbl]=D[tbl].concat(data); }
+  return n => n ? findBy(D[tbl],'nombre',n)?.id : null;
+}
+async function doImport(){
+  const T=IMP.type; let rows=IMP.ready.map(r=>({...r}));
+  try{
+    if(T==='movimientos'||T==='documentos'){
+      const cl=await ensureEntities('clientes', rows.map(r=>r._cliente)); const pr=await ensureEntities('proveedores', rows.map(r=>r._proveedor));
+      rows=rows.map(({_cliente,_proveedor,...r})=>({...r, cliente_id:cl(_cliente)||null, proveedor_id:pr(_proveedor)||null}));
+    }
+    const tbl={stock:'stock_movimientos'}[T]||T;
+    for(let i=0;i<rows.length;i+=500){
+      const chunk=rows.slice(i,i+500);
+      const q = T==='productos' ? sb.from(tbl).upsert(chunk,{onConflict:'sku'}) : T==='tipo_cambio' ? sb.from(tbl).upsert(chunk) : sb.from(tbl).insert(chunk);
+      const {error}=await q; if(error) throw error;
+    }
+    toast(`✔ ${rows.length} filas importadas`,4000); IMP.rows=null; await refresh();
+  }catch(e){ toast('Error al importar: '+e.message,7000); }
+}
+function downloadTemplate(){
+  const wb=XLSX.utils.book_new();
+  Object.entries(IMPORTS).forEach(([k,v])=>{ const ws=XLSX.utils.aoa_to_sheet([v.cols,...v.ex]); ws['!cols']=v.cols.map(()=>({wch:18})); XLSX.utils.book_append_sheet(wb,ws,k); });
+  const ay=[['Hoja','Valores válidos'],['movimientos.tipo','ingreso, pago, aporte, retiro'],['movimientos.cuenta','nombre exacto de la cuenta creada en Bancos'],['movimientos.socio','nombre exacto del socio (solo aportes/retiros)'],
+    ['documentos.entidad','cliente, proveedor'],['documentos.tipo','factura, saldo_inicial, nota_credito, ajuste'],['moneda','UYU, USD'],['stock.tipo','entrada, salida, ajuste (ajuste con signo)'],
+    ['oportunidades.etapa','prospecto, contactado, cotizado, negociacion, ganada, perdida'],['fechas','AAAA-MM-DD o DD/MM/AAAA']];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ay),'ayuda');
+  XLSX.writeFile(wb,'plantilla_surix_uy.xlsx');
+}
+function exportXLSX(kind){
+  const D=S.data; let rows=[];
+  if(kind==='movimientos') rows=D.movs.map(m=>({fecha:m.fecha,cuenta:m.cuentas?.nombre,moneda:m.cuentas?.moneda,tipo:m.tipo,monto:+m.monto,categoria:m.categoria,cliente:m.clientes?.nombre,proveedor:m.proveedores?.nombre,socio:m.socios?.nombre,descripcion:m.descripcion,comprobante:m.comprobante,cargado_por:m.cargado_por}));
+  if(kind==='stock') rows=D.vstock.map(p=>({sku:p.sku,nombre:p.nombre,categoria:p.categoria,stock:+p.stock,minimo:+p.stock_minimo,costo:+p.costo,moneda:p.moneda_costo}));
+  if(kind==='oportunidades') rows=D.opps.map(({id,created_at,...o})=>o);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),kind); XLSX.writeFile(wb,`surix_uy_${kind}_${today()}.xlsx`);
+}
+
+// ================= Start =================
+const h=location.hash.slice(1); if(TABS.some(([k])=>k===h)) S.tab=h;
+boot();
+</script>
+</body>
+</html>
