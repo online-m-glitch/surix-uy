@@ -488,12 +488,13 @@ function vOpps(){
 // ================= Socios =================
 function vSocios(){
   const D=S.data;
-  const agg={}; D.vsocios.forEach(r=>{ agg[r.id]=agg[r.id]||{UYU:{a:0,r:0},USD:{a:0,r:0}}; if(r.moneda){agg[r.id][r.moneda].a+=+r.aportes; agg[r.id][r.moneda].r+=+r.retiros;} });
+  const agg={}; D.vsocios.forEach(r=>{ agg[r.id]=agg[r.id]||{UYU:{a:0,r:0,da:0,dr:0},USD:{a:0,r:0,da:0,dr:0}}; if(r.moneda){const x=agg[r.id][r.moneda]; x.a+=+r.aportes; x.r+=+r.retiros; x.da+=+r.aportes_directos; x.dr+=+r.retiros_directos;} });
   const movs=D.movs.filter(m=>m.tipo==='aporte'||m.tipo==='retiro');
-  return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Solo los socios activos con email pueden entrar. Administradores cargan y editan; el resto solo ve.</p></div>
+  const cel=(id,mon,k)=>{const x=agg[id]?.[mon]; if(!x) return fmt(0); const d=k==='a'?x.da:x.dr, v=x[k]; return fmt(v)+(Math.abs(d-v)>0.01?`<div class="muted" style="font-size:11px">directo ${fmt(d)}</div>`:'');};
+  return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Aportes y retiros se reparten dentro de cada grupo según el % de participación ("directo" = lo que figura a nombre de cada uno). Solo los socios activos con email pueden entrar; administradores cargan y editan, el resto solo ve.</p></div>
     <div class="row"><button class="btn" onclick="openForm('movimientos',null,{tipo:'aporte'})">+ Aporte</button><button class="btn" onclick="openForm('movimientos',null,{tipo:'retiro'})">+ Retiro</button><button class="btn pri" onclick="openForm('socios')">+ Socio</button></div></div>
   <div class="card" style="margin-bottom:14px">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'Permiso',f:r=>r.rol==='admin'?'<span class="tag good">Administrador</span>':'<span class="tag">Solo lectura</span>'},{h:'%',n:1,f:r=>r.participacion??''},
-    {h:'Aportes $',n:1,f:r=>fmt(agg[r.id]?.UYU.a)},{h:'Retiros $',n:1,f:r=>fmt(agg[r.id]?.UYU.r)},{h:'Aportes US$',n:1,f:r=>fmt(agg[r.id]?.USD.a)},{h:'Retiros US$',n:1,f:r=>fmt(agg[r.id]?.USD.r)},
+    {h:'Grupo',f:r=>esc(r.grupo||r.nombre)},{h:'Aportes $',n:1,f:r=>cel(r.id,'UYU','a')},{h:'Retiros $',n:1,f:r=>cel(r.id,'UYU','r')},{h:'Aportes US$',n:1,f:r=>cel(r.id,'USD','a')},{h:'Retiros US$',n:1,f:r=>cel(r.id,'USD','r')},
     {h:'Neto US$ eq.',n:1,f:r=>{const g=agg[r.id]; if(!g) return fmt(0); const n=g.USD.a-g.USD.r+toUSD(g.UYU.a-g.UYU.r,'UYU'); return `<b class="${sign(n)}">${fmt(n)}</b>`}},
     {h:'',f:r=>actions('socios',r.id)}], D.socios)}</div>
   <div class="card"><h3>Detalle de aportes y retiros</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Socio',f:r=>esc(r.socios?.nombre||'—')},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='aporte'?'good':'warn'}">${TIPO_LBL[r.tipo]}</span>`},
@@ -539,7 +540,7 @@ const FORMS = {
     ['producto','Producto / solución','list',0,['Help IP','Telefonía IP','Voceo / WAN Page','Portero IP','Control de acceso','TimbreQR','Software salud']],
     ['monto_estimado','Monto estimado','num'],['moneda','Moneda','sel',0,[['USD','USD'],['UYU','UYU']]],['etapa','Etapa','sel',1,ETAPAS],['probabilidad','Probabilidad %','num'],
     ['responsable','Responsable','list',0,S.data.socios.map(s=>s.nombre)],['fecha_proximo','Fecha próximo paso','date'],['proximo_paso','Próximo paso','text',0,null,1],['notas','Notas','area']]},
-  socios:{t:'Socio', f:()=>[['nombre','Nombre','text',1],['email','Email (para ingresar)','text'],['participacion','Participación %','num'],['rol','Permiso','sel',1,[['lectura','Solo lectura'],['admin','Administrador (carga, edita y borra)']]],['activo','Activo','bool']]},
+  socios:{t:'Socio', f:()=>[['nombre','Nombre','text',1],['email','Email (para ingresar)','text'],['participacion','Participación %','num'],['grupo','Grupo (reparte aportes/retiros por %)','list',0,[...new Set(S.data.socios.map(s=>s.grupo).filter(Boolean))]],['rol','Permiso','sel',1,[['lectura','Solo lectura'],['admin','Administrador (carga, edita y borra)']]],['activo','Activo','bool']]},
   tipo_cambio:{t:'Tipo de cambio', pk:'fecha', f:()=>[['fecha','Fecha','date',1],['usd_uyu','1 USD = UYU','num',1]]},
 };
 const TBL_DATA = {cuentas:'cuentas',movimientos:'movs',documentos:'docs',clientes:'clientes',proveedores:'proveedores',productos:'productos',stock_movimientos:'smov',oportunidades:'opps',socios:'socios',tipo_cambio:'tc'};
