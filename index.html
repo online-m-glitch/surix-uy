@@ -102,6 +102,7 @@ tr:hover td{background:var(--surface-2)}
 .kcol h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--text-2);display:flex;justify-content:space-between}
 .kc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;cursor:pointer;font-size:13px}
 .kc b{display:block}
+.ro .btn[onclick*="openForm"],.ro .btn[onclick*="openTransfer"],.ro .btn[onclick*="delRow"],.ro .noadmin{display:none!important}
 .drop{display:block;border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;color:var(--text-2);cursor:pointer}
 @media (max-width:640px){main{padding:16px}.top{flex-wrap:wrap;padding:10px 16px}.logo{font-size:14px}#userEmail{display:none}.kpis{grid-template-columns:1fr 1fr}.kpi .v{font-size:18px}.fgrid{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
 @media print{header nav,.btn,.noprint{display:none!important}body{background:#fff}.card{box-shadow:none}}
@@ -156,7 +157,7 @@ const TABS = [
   ['proveedores','Deuda proveedores'],['stock','Stock'],['oportunidades','Oportunidades'],['socios','Socios'],
   ['importar','Importar Excel'],['config','Configuración']
 ];
-const S = { tab:'resumen', data:{}, tc:null, period:'semana' };
+const S = { tab:'resumen', data:{}, tc:null, period:'semana', admin:false };
 
 // ================= Helpers =================
 const $ = s => document.querySelector(s);
@@ -208,7 +209,9 @@ async function boot(){
   if(!session){ show('loginView'); return; }
   const {data:ok} = await sb.rpc('es_socio');
   if(!ok){ $('#naEmail').textContent = session.user.email; show('noAccess'); return; }
-  $('#userEmail').textContent = session.user.email;
+  const {data:adm} = await sb.rpc('es_admin'); S.admin = !!adm;
+  document.body.classList.toggle('ro', !S.admin);
+  $('#userEmail').innerHTML = esc(session.user.email) + (S.admin ? ' <span class="tag good">Administrador</span>' : ' <span class="tag">Solo lectura</span>');
   show('app'); renderNav(); await refresh();
 }
 function show(id){ ['loginView','noAccess','app'].forEach(x=>$('#'+x).classList.toggle('hidden', x!==id)); }
@@ -237,17 +240,18 @@ sb.auth.onAuthStateChange((ev)=>{ if(ev==='PASSWORD_RECOVERY'){ const p=prompt('
 (function(){ let t=null; try{t=localStorage.getItem('suy-theme')}catch(e){} if(t) document.documentElement.dataset.theme=t; })();
 $('#themeBtn').onclick=()=>{ const cur=document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
   const n=cur==='dark'?'light':'dark'; document.documentElement.dataset.theme=n; try{localStorage.setItem('suy-theme',n)}catch(e){} render(); };
-$('#tcChip').onclick=()=>openForm('tipo_cambio');
+$('#tcChip').onclick=()=>{ if(S.admin) openForm('tipo_cambio'); };
 
 // ================= Nav / render =================
 function renderNav(){
-  $('#nav').innerHTML = TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${l}</button>`).join('');
+  $('#nav').innerHTML = TABS.filter(([k])=>S.admin||k!=='importar').map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${l}</button>`).join('');
   $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; renderNav(); render(); try{history.replaceState(null,'','#'+S.tab)}catch(e){} });
 }
 async function refresh(){ await loadAll(); render(); }
 let charts=[];
 function render(){
   charts.forEach(c=>c.destroy()); charts=[];
+  if(!S.admin && S.tab==='importar') S.tab='resumen';
   const f = {resumen:vResumen,bancos:vBancos,movimientos:vMovimientos,clientes:vClientes,proveedores:vProveedores,
     stock:vStock,oportunidades:vOpps,socios:vSocios,importar:vImportar,config:vConfig}[S.tab];
   $('#main').innerHTML = f(); (AFTER[S.tab]||(()=>{}))();
@@ -258,7 +262,7 @@ function table(cols, rows, empty='Sin datos todavía'){
   return `<div class="tw"><table><thead><tr>${cols.map(c=>`<th class="${c.n?'n':''}">${c.h}</th>`).join('')}</tr></thead><tbody>${
     rows.map(r=>`<tr>${cols.map(c=>`<td class="${c.n?'n':''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-const actions = (tbl,id) => `<span class="noprint" style="white-space:nowrap"><button class="btn sm ghost" onclick="openForm('${tbl}',${id})">✎</button><button class="btn sm ghost danger" onclick="delRow('${tbl}',${id})">✕</button></span>`;
+const actions = (tbl,id) => !S.admin ? '' : `<span class="noprint" style="white-space:nowrap"><button class="btn sm ghost" onclick="openForm('${tbl}',${id})">✎</button><button class="btn sm ghost danger" onclick="delRow('${tbl}',${id})">✕</button></span>`;
 
 // ================= Period helpers =================
 function periodRange(p){
@@ -475,7 +479,7 @@ function vOpps(){
   return `<div class="row between"><div><h2>Oportunidades y posibles clientes</h2><p class="sub">Seguimiento de negociaciones. Clic en una tarjeta para editar.</p></div>
     <div class="row"><button class="btn" onclick="exportXLSX('oportunidades')">Exportar</button><button class="btn pri" onclick="openForm('oportunidades')">+ Oportunidad</button></div></div>
   <div class="kanban">${ETAPAS.map(([k,l])=>{ const os=D.opps.filter(o=>o.etapa===k); const t=os.reduce((a,o)=>a+toUSD(o.monto_estimado,o.moneda),0);
-    return `<div class="kcol"><h4><span>${l} · ${os.length}</span><span>${fmt0(t,'USD')}</span></h4>${os.map(o=>`<div class="kc" onclick="openForm('oportunidades',${o.id})">
+    return `<div class="kcol"><h4><span>${l} · ${os.length}</span><span>${fmt0(t,'USD')}</span></h4>${os.map(o=>`<div class="kc" onclick="S.admin&&openForm('oportunidades',${o.id})">
       <b>${esc(o.empresa)}</b><span class="muted">${esc(o.producto||'')}${o.monto_estimado?' · '+fmt0(o.monto_estimado,o.moneda):''}</span>
       ${o.proximo_paso?`<div style="margin-top:4px;font-size:12px">→ ${esc(o.proximo_paso)} ${o.fecha_proximo?`<span class="${o.fecha_proximo<today()?'neg':'muted'}">${fdate(o.fecha_proximo)}</span>`:''}</div>`:''}
       ${o.responsable?`<div class="muted" style="font-size:11px;margin-top:2px">${esc(o.responsable)} · ${o.probabilidad||0}%</div>`:''}</div>`).join('')}</div>`; }).join('')}</div>`;
@@ -486,9 +490,9 @@ function vSocios(){
   const D=S.data;
   const agg={}; D.vsocios.forEach(r=>{ agg[r.id]=agg[r.id]||{UYU:{a:0,r:0},USD:{a:0,r:0}}; if(r.moneda){agg[r.id][r.moneda].a+=+r.aportes; agg[r.id][r.moneda].r+=+r.retiros;} });
   const movs=D.movs.filter(m=>m.tipo==='aporte'||m.tipo==='retiro');
-  return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Solo los socios activos con email pueden entrar al sistema.</p></div>
+  return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Solo los socios activos con email pueden entrar. Administradores cargan y editan; el resto solo ve.</p></div>
     <div class="row"><button class="btn" onclick="openForm('movimientos',null,{tipo:'aporte'})">+ Aporte</button><button class="btn" onclick="openForm('movimientos',null,{tipo:'retiro'})">+ Retiro</button><button class="btn pri" onclick="openForm('socios')">+ Socio</button></div></div>
-  <div class="card" style="margin-bottom:14px">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'%',n:1,f:r=>r.participacion??''},
+  <div class="card" style="margin-bottom:14px">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'Permiso',f:r=>r.rol==='admin'?'<span class="tag good">Administrador</span>':'<span class="tag">Solo lectura</span>'},{h:'%',n:1,f:r=>r.participacion??''},
     {h:'Aportes $',n:1,f:r=>fmt(agg[r.id]?.UYU.a)},{h:'Retiros $',n:1,f:r=>fmt(agg[r.id]?.UYU.r)},{h:'Aportes US$',n:1,f:r=>fmt(agg[r.id]?.USD.a)},{h:'Retiros US$',n:1,f:r=>fmt(agg[r.id]?.USD.r)},
     {h:'Neto US$ eq.',n:1,f:r=>{const g=agg[r.id]; if(!g) return fmt(0); const n=g.USD.a-g.USD.r+toUSD(g.UYU.a-g.UYU.r,'UYU'); return `<b class="${sign(n)}">${fmt(n)}</b>`}},
     {h:'',f:r=>actions('socios',r.id)}], D.socios)}</div>
@@ -535,7 +539,7 @@ const FORMS = {
     ['producto','Producto / solución','list',0,['Help IP','Telefonía IP','Voceo / WAN Page','Portero IP','Control de acceso','TimbreQR','Software salud']],
     ['monto_estimado','Monto estimado','num'],['moneda','Moneda','sel',0,[['USD','USD'],['UYU','UYU']]],['etapa','Etapa','sel',1,ETAPAS],['probabilidad','Probabilidad %','num'],
     ['responsable','Responsable','list',0,S.data.socios.map(s=>s.nombre)],['fecha_proximo','Fecha próximo paso','date'],['proximo_paso','Próximo paso','text',0,null,1],['notas','Notas','area']]},
-  socios:{t:'Socio', f:()=>[['nombre','Nombre','text',1],['email','Email (para ingresar)','text'],['participacion','Participación %','num'],['activo','Activo','bool']]},
+  socios:{t:'Socio', f:()=>[['nombre','Nombre','text',1],['email','Email (para ingresar)','text'],['participacion','Participación %','num'],['rol','Permiso','sel',1,[['lectura','Solo lectura'],['admin','Administrador (carga, edita y borra)']]],['activo','Activo','bool']]},
   tipo_cambio:{t:'Tipo de cambio', pk:'fecha', f:()=>[['fecha','Fecha','date',1],['usd_uyu','1 USD = UYU','num',1]]},
 };
 const TBL_DATA = {cuentas:'cuentas',movimientos:'movs',documentos:'docs',clientes:'clientes',proveedores:'proveedores',productos:'productos',stock_movimientos:'smov',oportunidades:'opps',socios:'socios',tipo_cambio:'tc'};
@@ -546,7 +550,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 function openForm(tbl, id=null, preset={}){
   const F=FORMS[tbl]; const pk=F.pk||'id';
-  const rec = id!=null ? (S.data[TBL_DATA[tbl]]||[]).find(r=>r[pk]==id) : {fecha:today(), fecha_saldo_inicial:today(), activa:true, activo:true, moneda:'USD', moneda_costo:'USD', etapa:'prospecto', probabilidad:20, tipo: tbl==='cuentas'?'banco':undefined, ...preset};
+  const rec = id!=null ? (S.data[TBL_DATA[tbl]]||[]).find(r=>r[pk]==id) : {fecha:today(), fecha_saldo_inicial:today(), activa:true, activo:true, moneda:'USD', moneda_costo:'USD', etapa:'prospecto', probabilidad:20, rol:'lectura', tipo: tbl==='cuentas'?'banco':undefined, ...preset};
   const fields=F.f();
   const input=([k,l,t,req,opts,full])=>{
     const v=rec?.[k]; const r=req?'required':'';
