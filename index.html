@@ -369,14 +369,12 @@ AFTER.socios = ()=>{
   groups.forEach((G,i)=>{ G.color=pal[i%2===0?0:1]; G.p=G.m.reduce((a,x)=>a+Number(x.participacion),0);
     G.m.forEach(x=>{ x._c = G.m.length===1 ? G.color : pal[2+(k++%3)]; }); });
   const outer=groups.flatMap(G=>G.m), surf=c('--surface');
-  const ch=new Chart($('#chSoc'),{type:'doughnut',data:{labels:outer.map(x=>x.nombre),datasets:[
-      {label:'Socio',data:outer.map(x=>+x.participacion),backgroundColor:outer.map(x=>x._c),borderColor:surf,borderWidth:2,weight:1},
+  const ch=new Chart($('#chSoc'),{type:'doughnut',data:{labels:groups.map(G=>G.g),datasets:[
       {label:'Grupo',data:groups.map(G=>G.p),backgroundColor:groups.map(G=>G.color),borderColor:surf,borderWidth:2,weight:1.2}]},
-    options:{maintainAspectRatio:false,cutout:'45%',plugins:{legend:{display:false},tooltip:{callbacks:{
-      title:()=>'' ,label:x=>x.datasetIndex===0?`${outer[x.dataIndex].nombre}: ${(+x.raw).toLocaleString('es-UY')}%`:`${groups[x.dataIndex].g}: ${(+x.raw).toLocaleString('es-UY')}%`}}}}});
+    options:{maintainAspectRatio:false,cutout:'58%',plugins:{legend:{display:false},tooltip:{callbacks:{
+      title:()=>'' ,label:x=>`${groups[x.dataIndex].g}: ${(+x.raw).toLocaleString('es-UY')}%`}}}}});
   charts.push(ch);
-  $('#socLeg').innerHTML=groups.map(G=>`<li><i style="background:${G.color}"></i><b>${esc(G.g)}</b><span class="n"><b>${G.p.toLocaleString('es-UY',{maximumFractionDigits:2})}%</b></span></li>`+
-    (G.m.length>1?G.m.map(x=>`<li class="pl2"><i style="background:${x._c}"></i>${esc(x.nombre)}<span class="n">${(+x.participacion).toLocaleString('es-UY')}%</span></li>`).join(''):'')).join('');
+  $('#socLeg').innerHTML=groups.map(G=>`<li><i style="background:${G.color}"></i><b>${esc(G.g)}</b><span class="n"><b>${G.p.toLocaleString('es-UY',{maximumFractionDigits:2})}%</b></span></li>`).join('');
 };
 AFTER.resumen = ()=>{
   const weeks=[]; const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7));
@@ -415,7 +413,7 @@ const TIPO_LBL = {ingreso:'Ingreso',pago:'Pago',aporte:'Aporte socio',retiro:'Re
 function vMovimientos(){
   const D=S.data; const q=MF.q.toLowerCase();
   const rows=D.movs.filter(m=>(!MF.tipo||m.tipo===MF.tipo)&&(!MF.cuenta||m.cuenta_id==MF.cuenta)&&(!MF.desde||m.fecha>=MF.desde)&&(!MF.hasta||m.fecha<=MF.hasta)&&
-    (!q||[m.descripcion,m.categoria,m.comprobante,m.clientes?.nombre,m.proveedores?.nombre,m.socios?.nombre].join(' ').toLowerCase().includes(q)));
+    (!q||[m.descripcion,m.categoria,m.comprobante,m.clientes?.nombre,m.proveedores?.nombre,m.socios?.nombre,m.grupo].join(' ').toLowerCase().includes(q)));
   const tot={UYU:0,USD:0}; rows.forEach(m=>{const s=['ingreso','aporte','transferencia_in'].includes(m.tipo)?1:-1; tot[m.cuentas?.moneda]+=s*m.monto;});
   return `<div class="row between"><div><h2>Movimientos de caja y banco</h2><p class="sub">Ingresos, pagos, aportes y retiros. Un ingreso con cliente descuenta su cuenta corriente; un pago con proveedor descuenta la deuda.</p></div>
     <div class="row"><button class="btn" onclick="exportXLSX('movimientos')">Exportar</button><button class="btn pri" onclick="openForm('movimientos')">+ Movimiento</button></div></div>
@@ -429,7 +427,7 @@ function vMovimientos(){
     </div>
     ${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Tipo',f:r=>`<span class="tag ${['ingreso','aporte','transferencia_in'].includes(r.tipo)?'good':'bad'}">${TIPO_LBL[r.tipo]}</span>`},
       {h:'Cuenta',f:r=>esc(r.cuentas?.nombre)},{h:'Categoría',f:r=>esc(r.categoria||'')},
-      {h:'Cliente / Proveedor / Socio',f:r=>esc(r.clientes?.nombre||r.proveedores?.nombre||r.socios?.nombre||'')},
+      {h:'Cliente / Proveedor / Socio',f:r=>esc(r.clientes?.nombre||r.proveedores?.nombre||r.socios?.nombre||(r.grupo?'Grupo '+r.grupo:''))},
       {h:'Descripción',f:r=>esc(r.descripcion||'')+(r.comprobante?` <span class="muted">#${esc(r.comprobante)}</span>`:'')},
       {h:'Monto',n:1,f:r=>`<span class="${['ingreso','aporte','transferencia_in'].includes(r.tipo)?'pos':'neg'}">${fmt(r.monto,r.cuentas?.moneda)}</span>`},
       {h:'',f:r=>actions('movimientos',r.id)}], rows.slice(0,500))}
@@ -523,7 +521,7 @@ function vSocios(){
     {h:'Neto US$ eq.',n:1,f:r=>{const g=agg[r.id]; if(!g) return fmt(0); const n=g.USD.a-g.USD.r+toUSD(g.UYU.a-g.UYU.r,'UYU'); return `<b class="${sign(n)}">${fmt(n)}</b>`}},
     {h:'',f:r=>actions('socios',r.id)}], D.socios)}</div>
     <div class="card"><h3>Participación societaria</h3><div class="chart-box" style="height:200px"><canvas id="chSoc" aria-label="Participación societaria por grupo y socio"></canvas></div><ul class="pleg" id="socLeg"></ul></div></div>
-  <div class="card"><h3>Detalle de aportes y retiros</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Socio',f:r=>esc(r.socios?.nombre||'—')},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='aporte'?'good':'warn'}">${TIPO_LBL[r.tipo]}</span>`},
+  <div class="card"><h3>Detalle de aportes y retiros</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Socio',f:r=>esc(r.socios?.nombre||(r.grupo?'Grupo '+r.grupo:'—'))},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='aporte'?'good':'warn'}">${TIPO_LBL[r.tipo]}</span>`},
     {h:'Cuenta',f:r=>esc(r.cuentas?.nombre)},{h:'Descripción',f:r=>esc(r.descripcion||'')},{h:'Monto',n:1,f:r=>fmt(r.monto,r.cuentas?.moneda)},{h:'',f:r=>actions('movimientos',r.id)}], movs)}</div>`;
 }
 
@@ -542,6 +540,7 @@ function vConfig(){
 }
 
 // ================= Forms =================
+const grupos = () => [...new Set(S.data.socios.map(s=>s.grupo).filter(Boolean))];
 const opt = (arr, lab='nombre') => arr.map(x=>[x.id, typeof lab==='function'?lab(x):x[lab]]);
 const FORMS = {
   cuentas:{t:'Cuenta', f:()=>[['nombre','Nombre','text',1],['banco','Banco','text'],['moneda','Moneda','sel',1,[['UYU','Pesos (UYU)'],['USD','Dólares (USD)']]],
@@ -549,7 +548,7 @@ const FORMS = {
   movimientos:{t:'Movimiento', f:()=>[['fecha','Fecha','date',1],['tipo','Tipo','sel',1,Object.entries(TIPO_LBL).filter(([k])=>!k.startsWith('transf'))],
     ['cuenta_id','Cuenta','sel',1,opt(S.data.cuentas,c=>`${c.nombre} (${c.moneda})`)],['monto','Monto','num',1],
     ['categoria','Categoría','list',0,['Ventas','Cobro cliente','Proveedores','Importación','Sueldos','Impuestos','Alquiler','Servicios','Comisiones bancarias','Fletes','Otros']],
-    ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],['socio_id','Socio','sel',0,opt(S.data.socios)],
+    ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],['socio_id','Socio / grupo','sel',0,[...grupos().filter(g=>S.data.socios.filter(x=>x.grupo===g).length>1).map(g=>['g:'+g,'Grupo '+g+' (se reparte por %)']),...opt(S.data.socios)]],
     ['comprobante','Comprobante','text'],['descripcion','Descripción','text',0,null,1]]},
   documentos:{t:'Factura / documento de cta. cte.', f:()=>[['entidad','Tipo de cuenta','sel',1,[['cliente','Cliente (nos debe)'],['proveedor','Proveedor (le debemos)']]],
     ['cliente_id','Cliente','sel',0,opt(S.data.clientes)],['proveedor_id','Proveedor','sel',0,opt(S.data.proveedores)],
@@ -579,6 +578,7 @@ function openForm(tbl, id=null, preset={}){
   const F=FORMS[tbl]; const pk=F.pk||'id';
   const rec = id!=null ? (S.data[TBL_DATA[tbl]]||[]).find(r=>r[pk]==id) : {fecha:today(), fecha_saldo_inicial:today(), activa:true, activo:true, moneda:'USD', moneda_costo:'USD', etapa:'prospecto', probabilidad:20, rol:'lectura', tipo: tbl==='cuentas'?'banco':undefined, ...preset};
   const fields=F.f();
+  if(tbl==='movimientos' && rec && rec.grupo && !rec.socio_id) rec.socio_id='g:'+rec.grupo;
   const input=([k,l,t,req,opts,full])=>{
     const v=rec?.[k]; const r=req?'required':'';
     let h;
@@ -602,7 +602,8 @@ function openForm(tbl, id=null, preset={}){
   frm.addEventListener('change',toggle); toggle();
   frm.onsubmit=async e=>{
     e.preventDefault(); const row={};
-    fields.forEach(([k,,t])=>{ let v=frm[k].value; if(v===''){ row[k]=null; return; } if(t==='num') v=Number(v); if(t==='bool') v=v==='true'; if(t==='sel'&&/_id$/.test(k)) v=Number(v); row[k]=v; });
+    fields.forEach(([k,,t])=>{ let v=frm[k].value; if(v===''){ row[k]=null; return; } if(t==='num') v=Number(v); if(t==='bool') v=v==='true'; if(k==='socio_id'&&String(v).startsWith('g:')){ row.grupo=v.slice(2); row[k]=null; return; } if(t==='sel'&&/_id$/.test(k)) v=Number(v); row[k]=v; });
+    if(tbl==='movimientos' && !('grupo' in row)) row.grupo=null;
     if(tbl==='documentos' && !(row.cliente_id||row.proveedor_id)){ $('#frmMsg').textContent='Elegí el cliente o proveedor.'; return; }
     if(tbl==='oportunidades') row.actualizado=new Date().toISOString();
     const q = id!=null ? sb.from(tbl).update(row).eq(pk,id) : (tbl==='tipo_cambio'? sb.from(tbl).upsert(row) : sb.from(tbl).insert(row));
@@ -689,8 +690,8 @@ function validateImport(){
       const tipo=norm(r.tipo); if(!['ingreso','pago','aporte','retiro'].includes(tipo)) return err(`tipo "${r.tipo}" inválido (ingreso/pago/aporte/retiro)`);
       const monto=parseNum(r.monto); if(!(monto>0)) return err('monto inválido');
       const fecha=parseDate(r.fecha); if(!fecha||fecha==='x') return err('fecha inválida');
-      let socio_id=null; if(r.socio){ const s=findBy(D.socios,'nombre',r.socio); if(!s) return err(`socio "${r.socio}" no existe`); socio_id=s.id; }
-      o={fecha,cuenta_id:c.id,tipo,monto,categoria:r.categoria||null,descripcion:r.descripcion||null,comprobante:r.comprobante?String(r.comprobante):null,socio_id,_cliente:r.cliente||null,_proveedor:r.proveedor||null};
+      let socio_id=null, grupo=null; if(r.socio){ const s=findBy(D.socios,'nombre',r.socio); if(s) socio_id=s.id; else { grupo=[...new Set(D.socios.map(x=>x.grupo).filter(Boolean))].find(g=>norm(g)===norm(r.socio)||norm('grupo '+g)===norm(r.socio))||null; if(!grupo) return err(`socio o grupo "${r.socio}" no existe`); } }
+      o={fecha,cuenta_id:c.id,tipo,monto,categoria:r.categoria||null,descripcion:r.descripcion||null,comprobante:r.comprobante?String(r.comprobante):null,socio_id,grupo,_cliente:r.cliente||null,_proveedor:r.proveedor||null};
     } else if(T==='documentos'){
       const ent=norm(r.entidad); if(!['cliente','proveedor'].includes(ent)) return err('entidad debe ser cliente o proveedor');
       if(!r.nombre) return err('falta nombre'); const tipo=norm(r.tipo)||'factura'; if(!['factura','nota_credito','saldo_inicial','ajuste'].includes(tipo)) return err(`tipo "${r.tipo}" inválido`);
@@ -753,7 +754,7 @@ function downloadTemplate(){
 }
 function exportXLSX(kind){
   const D=S.data; let rows=[];
-  if(kind==='movimientos') rows=D.movs.map(m=>({fecha:m.fecha,cuenta:m.cuentas?.nombre,moneda:m.cuentas?.moneda,tipo:m.tipo,monto:+m.monto,categoria:m.categoria,cliente:m.clientes?.nombre,proveedor:m.proveedores?.nombre,socio:m.socios?.nombre,descripcion:m.descripcion,comprobante:m.comprobante,cargado_por:m.cargado_por}));
+  if(kind==='movimientos') rows=D.movs.map(m=>({fecha:m.fecha,cuenta:m.cuentas?.nombre,moneda:m.cuentas?.moneda,tipo:m.tipo,monto:+m.monto,categoria:m.categoria,cliente:m.clientes?.nombre,proveedor:m.proveedores?.nombre,socio:m.socios?.nombre||m.grupo,descripcion:m.descripcion,comprobante:m.comprobante,cargado_por:m.cargado_por}));
   if(kind==='stock') rows=D.vstock.map(p=>({sku:p.sku,nombre:p.nombre,categoria:p.categoria,stock:+p.stock,minimo:+p.stock_minimo,costo:+p.costo,moneda:p.moneda_costo}));
   if(kind==='oportunidades') rows=D.opps.map(({id,created_at,...o})=>o);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),kind); XLSX.writeFile(wb,`surix_uy_${kind}_${today()}.xlsx`);
