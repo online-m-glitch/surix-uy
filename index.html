@@ -14,7 +14,7 @@
   --bg:#f4f5f7; --surface:#fff; --surface-2:#f9fafb; --border:#e3e6ea;
   --text:#0f1720; --text-2:#4b5563; --muted:#8a94a3;
   --brand:#0b5cad; --brand-2:#e8f1fb;
-  --s1:#2a78d6; --s2:#eb6834;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
   --good:#12805c; --good-bg:#e7f6ef; --warn:#b26a00; --warn-bg:#fff4e0; --bad:#c23b3a; --bad-bg:#fdecec;
   --radius:10px; --shadow:0 1px 2px rgba(16,24,40,.06);
 }
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#111315; --surface:#1a1c1f; --surface-2:#202327; --border:#2d3136;
     --text:#f2f4f6; --text-2:#c3c7cd; --muted:#8b939e;
-    --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926;
+    --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
     --good:#4cc796; --good-bg:#15291f; --warn:#f0b04a; --warn-bg:#2d2412; --bad:#f07574; --bad-bg:#2e1718;
   }
 }
 :root[data-theme="dark"]{
   --bg:#111315; --surface:#1a1c1f; --surface-2:#202327; --border:#2d3136;
   --text:#f2f4f6; --text-2:#c3c7cd; --muted:#8b939e;
-  --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926;
+  --brand:#5aa2ee; --brand-2:#1b2a3b; --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
   --good:#4cc796; --good-bg:#15291f; --warn:#f0b04a; --warn-bg:#2d2412; --bad:#f07574; --bad-bg:#2e1718;
 }
 *{box-sizing:border-box}
@@ -97,6 +97,13 @@ tr:hover td{background:var(--surface-2)}
 .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;color:var(--text-2)}
 .seg button.on{background:var(--brand-2);color:var(--brand);font-weight:600}
+.socgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;margin-bottom:14px;align-items:start}
+@media (max-width:1100px){.socgrid{grid-template-columns:1fr}}
+.pleg{list-style:none;margin:10px 0 0;padding:0;font-size:13px}
+.pleg li{display:flex;align-items:center;gap:8px;padding:4px 0}
+.pleg li.pl2{padding-left:18px;color:var(--text-2);font-size:12px}
+.pleg i{width:10px;height:10px;border-radius:3px;flex:none}
+.pleg .n{margin-left:auto;font-variant-numeric:tabular-nums}
 .kanban{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:10px;overflow-x:auto}
 .kcol{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:120px}
 .kcol h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--text-2);display:flex;justify-content:space-between}
@@ -353,6 +360,24 @@ function vResumen(){
     </div>
   </div>`;
 }
+AFTER.socios = ()=>{
+  const cs=getComputedStyle(document.documentElement), c=v=>cs.getPropertyValue(v).trim();
+  const soc=S.data.socios.filter(x=>x.activo && Number(x.participacion)>0);
+  const groups=[]; soc.forEach(x=>{const g=x.grupo||x.nombre; let G=groups.find(y=>y.g===g); if(!G){G={g,m:[]};groups.push(G);} G.m.push(x);});
+  groups.sort((a,b)=>a.m.length-b.m.length);
+  const pal=['--s1','--s2','--s3','--s4','--s5'].map(c); let k=0;
+  groups.forEach((G,i)=>{ G.color=pal[i%2===0?0:1]; G.p=G.m.reduce((a,x)=>a+Number(x.participacion),0);
+    G.m.forEach(x=>{ x._c = G.m.length===1 ? G.color : pal[2+(k++%3)]; }); });
+  const outer=groups.flatMap(G=>G.m), surf=c('--surface');
+  const ch=new Chart($('#chSoc'),{type:'doughnut',data:{labels:outer.map(x=>x.nombre),datasets:[
+      {label:'Socio',data:outer.map(x=>+x.participacion),backgroundColor:outer.map(x=>x._c),borderColor:surf,borderWidth:2,weight:1},
+      {label:'Grupo',data:groups.map(G=>G.p),backgroundColor:groups.map(G=>G.color),borderColor:surf,borderWidth:2,weight:1.2}]},
+    options:{maintainAspectRatio:false,cutout:'45%',plugins:{legend:{display:false},tooltip:{callbacks:{
+      title:()=>'' ,label:x=>x.datasetIndex===0?`${outer[x.dataIndex].nombre}: ${(+x.raw).toLocaleString('es-UY')}%`:`${groups[x.dataIndex].g}: ${(+x.raw).toLocaleString('es-UY')}%`}}}}});
+  charts.push(ch);
+  $('#socLeg').innerHTML=groups.map(G=>`<li><i style="background:${G.color}"></i><b>${esc(G.g)}</b><span class="n"><b>${G.p.toLocaleString('es-UY',{maximumFractionDigits:2})}%</b></span></li>`+
+    (G.m.length>1?G.m.map(x=>`<li class="pl2"><i style="background:${x._c}"></i>${esc(x.nombre)}<span class="n">${(+x.participacion).toLocaleString('es-UY')}%</span></li>`).join(''):'')).join('');
+};
 AFTER.resumen = ()=>{
   const weeks=[]; const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7));
   for(let i=11;i>=0;i--){ const s=new Date(d); s.setDate(d.getDate()-7*i); weeks.push(s.toISOString().slice(0,10)); }
@@ -493,10 +518,11 @@ function vSocios(){
   const cel=(id,mon,k)=>{const x=agg[id]?.[mon]; if(!x) return fmt(0); const d=k==='a'?x.da:x.dr, v=x[k]; return fmt(v)+(Math.abs(d-v)>0.01?`<div class="muted" style="font-size:11px">directo ${fmt(d)}</div>`:'');};
   return `<div class="row between"><div><h2>Socios</h2><p class="sub">Aportes y retiros. Aportes y retiros se reparten dentro de cada grupo según el % de participación ("directo" = lo que figura a nombre de cada uno). Solo los socios activos con email pueden entrar; administradores cargan y editan, el resto solo ve.</p></div>
     <div class="row"><button class="btn" onclick="openForm('movimientos',null,{tipo:'aporte'})">+ Aporte</button><button class="btn" onclick="openForm('movimientos',null,{tipo:'retiro'})">+ Retiro</button><button class="btn pri" onclick="openForm('socios')">+ Socio</button></div></div>
-  <div class="card" style="margin-bottom:14px">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'Permiso',f:r=>r.rol==='admin'?'<span class="tag good">Administrador</span>':'<span class="tag">Solo lectura</span>'},{h:'%',n:1,f:r=>r.participacion??''},
-    {h:'Grupo',f:r=>esc(r.grupo||r.nombre)},{h:'Aportes $',n:1,f:r=>cel(r.id,'UYU','a')},{h:'Retiros $',n:1,f:r=>cel(r.id,'UYU','r')},{h:'Aportes US$',n:1,f:r=>cel(r.id,'USD','a')},{h:'Retiros US$',n:1,f:r=>cel(r.id,'USD','r')},
+  <div class="socgrid"><div class="card">${table([{h:'Socio',f:r=>esc(r.nombre)+(r.activo?'':' <span class="tag">inactivo</span>')},{h:'Email (acceso)',f:r=>esc(r.email||'')},{h:'Permiso',f:r=>r.rol==='admin'?'<span class="tag good">Administrador</span>':'<span class="tag">Solo lectura</span>'},{h:'%',n:1,f:r=>r.participacion??''},
+    {h:'Grupo',f:r=>`<span style="white-space:nowrap">${esc(r.grupo||r.nombre)}</span>`},{h:'Aportes $',n:1,f:r=>cel(r.id,'UYU','a')},{h:'Retiros $',n:1,f:r=>cel(r.id,'UYU','r')},{h:'Aportes US$',n:1,f:r=>cel(r.id,'USD','a')},{h:'Retiros US$',n:1,f:r=>cel(r.id,'USD','r')},
     {h:'Neto US$ eq.',n:1,f:r=>{const g=agg[r.id]; if(!g) return fmt(0); const n=g.USD.a-g.USD.r+toUSD(g.UYU.a-g.UYU.r,'UYU'); return `<b class="${sign(n)}">${fmt(n)}</b>`}},
     {h:'',f:r=>actions('socios',r.id)}], D.socios)}</div>
+    <div class="card"><h3>Participación societaria</h3><div class="chart-box" style="height:200px"><canvas id="chSoc" aria-label="Participación societaria por grupo y socio"></canvas></div><ul class="pleg" id="socLeg"></ul></div></div>
   <div class="card"><h3>Detalle de aportes y retiros</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Socio',f:r=>esc(r.socios?.nombre||'—')},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='aporte'?'good':'warn'}">${TIPO_LBL[r.tipo]}</span>`},
     {h:'Cuenta',f:r=>esc(r.cuentas?.nombre)},{h:'Descripción',f:r=>esc(r.descripcion||'')},{h:'Monto',n:1,f:r=>fmt(r.monto,r.cuentas?.moneda)},{h:'',f:r=>actions('movimientos',r.id)}], movs)}</div>`;
 }
