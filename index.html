@@ -646,8 +646,8 @@ const EXT_RX={
   debito:/^(debito|debitos|debe|egreso|egresos|cargo|cargos|retiro)$/,
   credito:/^(credito|creditos|haber|ingreso|ingresos|abono|deposito)$/,
   saldo:/^(saldo|partial_balance|balance|saldo_parcial)$/,
-  ref:/^(referencia|reference_id|id_de_operacion|numero_de_operacion|n_de_operacion|nro_operacion|operacion|comprobante|documento|nro_documento|id)$/};
-const EXT_CATS=[[/\bbps\b/,'Costos fijos'],[/\birae\b/,'IRAE'],[/\bdgi\b|\biva\b/,'IVA'],[/mercado ?libre|\bmeli\b/,'MELI'],[/comision|cargo|mantenimiento/,'Costos fijos'],[/sueldo|salario/,'Sueldos']];
+  ref:/^(referencia|reference_id|numero_de_movimiento|id_de_movimiento|id_de_operacion|numero_de_operacion|n_de_operacion|nro_operacion|operacion|comprobante|documento|nro_documento|id)$/};
+const EXT_CATS=[[/\bbps\b/,'Costos fijos'],[/\birae\b/,'IRAE'],[/\bdgi\b|\biva\b|valor agregado|retencion de impuesto|decreto/,'IVA'],[/mercado ?libre|\bmeli\b|envio|cross docking|proteccion al comprador|mercado ?pago/,'MELI'],[/^cobro\b/,'Ventas'],[/ingreso de dinero/,'Otros'],[/comision|cargo|mantenimiento/,'Costos fijos'],[/sueldo|salario/,'Sueldos']];
 function openExtracto(){
   const cs=S.data.cuentas.filter(c=>c.activa!==false);
   EXT.cuenta=EXT.cuenta||cs[0]?.id; EXT.body=[]; EXT.items=[]; EXT.file='';
@@ -690,7 +690,7 @@ async function readExtracto(file){
   Object.keys(EXT_RX).forEach(f=>{ let i=ks.findIndex(k=>EXT_RX[f].test(k)); if(i<0&&f==='fecha') i=ks.findIndex(k=>k.startsWith('fecha')); if(i<0&&f==='desc') i=ks.findIndex(k=>/descrip|concepto|detalle/.test(k)); if(i>=0) EXT.map[f]=i; });
   if(EXT.map.importe!=null && (EXT.map.debito!=null||EXT.map.credito!=null)) delete EXT.map.importe;
   // sugerir cuenta según archivo
-  const mp=/mercado|mp_|account_statement|release_date/i.test(file.name+' '+EXT.head.join(' '));
+  const mp=/mercado|mp_|account_statement|release_date|_movements_|movimiento|operacion relacionada/i.test(file.name+' '+EXT.head.join(' '));
   if(mp){ const c=S.data.cuentas.find(c=>/mercado/i.test(c.nombre)); if(c){ EXT.cuenta=c.id; $('#xCta').value=c.id; } }
   buildExt();
 }
@@ -813,6 +813,7 @@ function parseNum(v){ if(v===''||v==null) return null; if(typeof v==='number') r
   if(s.includes(',')&&s.includes('.')) s = s.lastIndexOf(',')>s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
   else if(s.includes(',')) s=s.replace(',','.'); const n=Number(s); return isNaN(n)?NaN:n; }
 function parseDate(v){ if(!v) return null; if(v instanceof Date) return new Date(v.getTime()-v.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(String(v).trim())){ const d=new Date(String(v).trim()); if(!isNaN(d)) return new Date(d.getTime()-3*36e5).toISOString().slice(0,10); } // hora Uruguay (UTC-3)
   const s=String(v).trim(); let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
   m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); if(m){ const y=m[3].length===2?'20'+m[3]:m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   return 'x'; }
