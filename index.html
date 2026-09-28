@@ -481,23 +481,28 @@ function ccDetail(kind,id){
 }
 
 // ================= Stock =================
-const SF={q:''};
+const SF={q:'',cat:''};
 function vStock(){
   const D=S.data; const q=SF.q.toLowerCase();
-  const rows=D.vstock.filter(p=>!q||(p.sku+' '+p.nombre+' '+(p.categoria||'')).toLowerCase().includes(q));
+  const cats=[...new Set(D.vstock.map(p=>p.categoria||'Sin categoría'))].sort((a,b)=>a.localeCompare(b,'es'));
+  if(SF.cat && !cats.includes(SF.cat)) SF.cat='';
+  const rows=D.vstock.filter(p=>(!SF.cat||(p.categoria||'Sin categoría')===SF.cat)&&(!q||(p.sku+' '+p.nombre+' '+(p.categoria||'')).toLowerCase().includes(q)));
+  const ids=new Set(rows.map(p=>p.id));
   const val=rows.reduce((a,p)=>a+toUSD(Math.max(0,p.stock)*Number(p.costo||0),p.moneda_costo),0);
   return `<div class="row between"><div><h2>Stock e inventario</h2><p class="sub">Stock = entradas − salidas ± ajustes. Valorizado a costo.</p></div>
     <div class="row"><button class="btn" onclick="exportXLSX('stock')">Exportar</button><button class="btn" onclick="openForm('productos')">+ Producto</button><button class="btn pri" onclick="openForm('stock_movimientos')">+ Entrada / salida</button></div></div>
   <div class="card" style="margin-bottom:14px">
-    <div class="row noprint" style="margin-bottom:12px"><input placeholder="Buscar SKU, nombre, categoría…" value="${esc(SF.q)}" oninput="SF.q=this.value;debRender()" style="min-width:260px"><span class="muted">${rows.length} productos · valor ${fmt0(val,'USD')}</span></div>
+    <div class="row noprint" style="margin-bottom:12px"><input placeholder="Buscar SKU, nombre, categoría…" value="${esc(SF.q)}" oninput="SF.q=this.value;debRender()" style="min-width:260px">
+      <select onchange="SF.cat=this.value;render()" style="min-width:200px"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${SF.cat===c?'selected':''}>${esc(c)} (${D.vstock.filter(p=>(p.categoria||'Sin categoría')===c).length})</option>`).join('')}</select>
+      <span class="muted">${rows.length} productos · valor ${fmt0(val,'USD')}</span></div>
     ${table([{h:'SKU',f:r=>esc(r.sku)},{h:'Producto',f:r=>esc(r.nombre)},{h:'Categoría',f:r=>esc(r.categoria||'')},
       {h:'Stock',n:1,f:r=>`<b class="${Number(r.stock)<Number(r.stock_minimo||0)?'neg':''}">${Number(r.stock)}</b> <span class="muted">${esc(r.unidad||'')}</span>`},
       {h:'Mín.',n:1,f:r=>r.stock_minimo||0},{h:'Costo',n:1,f:r=>fmt(r.costo,r.moneda_costo)},{h:'Valor',n:1,f:r=>fmt(Math.max(0,r.stock)*r.costo,r.moneda_costo)},
       {h:'Últ. mov.',f:r=>fdate(r.ultimo_mov)},{h:'',f:r=>actions('productos',r.id)}], rows,'Cargá productos o importalos desde Excel')}
   </div>
-  <div class="card"><h3>Últimos movimientos de stock</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='entrada'?'good':r.tipo==='salida'?'bad':''}">${r.tipo}</span>`},
+  <div class="card"><h3>Últimos movimientos de stock${SF.cat?' · '+esc(SF.cat):''}</h3>${table([{h:'Fecha',f:r=>fdate(r.fecha)},{h:'Tipo',f:r=>`<span class="tag ${r.tipo==='entrada'?'good':r.tipo==='salida'?'bad':''}">${r.tipo}</span>`},
     {h:'Producto',f:r=>esc((r.productos?.sku||'')+' · '+(r.productos?.nombre||''))},{h:'Cant.',n:1,f:r=>r.cantidad},{h:'Costo u.',n:1,f:r=>r.costo_unitario?fmt(r.costo_unitario):''},
-    {h:'Referencia',f:r=>esc(r.referencia||'')},{h:'',f:r=>actions('stock_movimientos',r.id)}], D.smov.slice(0,200))}</div>`;
+    {h:'Referencia',f:r=>esc(r.referencia||'')},{h:'',f:r=>actions('stock_movimientos',r.id)}], (SF.cat?D.smov.filter(m=>ids.has(m.producto_id)):D.smov).slice(0,200))}</div>`;
 }
 
 // ================= Oportunidades =================
@@ -899,7 +904,7 @@ function downloadTemplate(){
 function exportXLSX(kind){
   const D=S.data; let rows=[];
   if(kind==='movimientos') rows=D.movs.map(m=>({fecha:m.fecha,cuenta:m.cuentas?.nombre,moneda:m.cuentas?.moneda,tipo:m.tipo,monto:+m.monto,categoria:m.categoria,cliente:m.clientes?.nombre,proveedor:m.proveedores?.nombre,socio:m.socios?.nombre||m.grupo,descripcion:m.descripcion,comprobante:m.comprobante,cargado_por:m.cargado_por}));
-  if(kind==='stock') rows=D.vstock.map(p=>({sku:p.sku,nombre:p.nombre,categoria:p.categoria,stock:+p.stock,minimo:+p.stock_minimo,costo:+p.costo,moneda:p.moneda_costo}));
+  if(kind==='stock') rows=D.vstock.filter(p=>!SF.cat||(p.categoria||'Sin categoría')===SF.cat).map(p=>({sku:p.sku,nombre:p.nombre,categoria:p.categoria,stock:+p.stock,minimo:+p.stock_minimo,costo:+p.costo,moneda:p.moneda_costo}));
   if(kind==='oportunidades') rows=D.opps.map(({id,created_at,...o})=>o);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),kind); XLSX.writeFile(wb,`surix_uy_${kind}_${today()}.xlsx`);
 }
