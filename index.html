@@ -109,7 +109,11 @@ tr:hover td{background:var(--surface-2)}
 .kcol h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--text-2);display:flex;justify-content:space-between}
 .kc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;cursor:pointer;font-size:13px}
 .kc b{display:block}
-.ro .btn[onclick*="openForm"],.ro .btn[onclick*="openTransfer"],.ro .btn[onclick*="delRow"],.ro .noadmin{display:none!important}
+.ro .btn[onclick*="openExtracto"],.ro .btn[onclick*="openForm"],.ro .btn[onclick*="openTransfer"],.ro .btn[onclick*="delRow"],.ro .noadmin{display:none!important}
+.xt{width:100%;border-collapse:collapse;font-size:12px}.xt th,.xt td{padding:5px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+.xt th{color:var(--text-2);font-weight:600;position:sticky;top:0;background:var(--surface)}.xt td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.xt select,.xt input{font-size:12px;padding:3px 5px;min-width:0;width:100%}.xt tr.off td{opacity:.45}.xtwrap{max-height:48vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.xmap{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
 .drop{display:block;border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;color:var(--text-2);cursor:pointer}
 @media (max-width:640px){main{padding:16px}.top{flex-wrap:wrap;padding:10px 16px}.logo{font-size:14px}#userEmail{display:none}.kpis{grid-template-columns:1fr 1fr}.kpi .v{font-size:18px}.fgrid{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
 @media print{header nav,.btn,.noprint{display:none!important}body{background:#fff}.card{box-shadow:none}}
@@ -168,6 +172,7 @@ const S = { tab:'resumen', data:{}, tc:null, period:'semana', admin:false };
 
 // ================= Helpers =================
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = (n, cur) => {
   const v = Number(n||0);
@@ -398,7 +403,7 @@ AFTER.resumen = ()=>{
 function vBancos(){
   const D=S.data;
   return `<div class="row between"><div><h2>Cuentas bancarias y caja</h2><p class="sub">Saldo = saldo inicial + movimientos desde la fecha del saldo inicial</p></div>
-    <div class="row"><button class="btn" onclick="openTransfer()">⇄ Transferencia</button><button class="btn pri" onclick="openForm('cuentas')">+ Cuenta</button></div></div>
+    <div class="row"><button class="btn" onclick="openExtracto()">⬆ Importar extracto</button><button class="btn" onclick="openTransfer()">⇄ Transferencia</button><button class="btn pri" onclick="openForm('cuentas')">+ Cuenta</button></div></div>
   <div class="card">${table([
     {h:'Cuenta',f:r=>esc(r.nombre)},{h:'Banco',f:r=>esc(r.banco||'')},{h:'Moneda',f:r=>r.moneda},{h:'Tipo',f:r=>r.tipo},
     {h:'Saldo inicial',n:1,f:r=>{const c=D.cuentas.find(x=>x.id===r.id);return fmt(c?.saldo_inicial,r.moneda)+` <span class="muted">${fdate(c?.fecha_saldo_inicial)}</span>`}},
@@ -629,6 +634,144 @@ function openTransfer(){
       {fecha:f.f.value,cuenta_id:+f.a.value,tipo:'transferencia_out',monto:m1,categoria:'Transferencia',descripcion:f.d.value||null,transferencia_ref:ref},
       {fecha:f.f.value,cuenta_id:+f.b.value,tipo:'transferencia_in',monto:m2,categoria:'Transferencia',descripcion:f.d.value||null,transferencia_ref:ref}]);
     if(error){ $('#tfMsg').textContent=error.message; return; } closeModal(); toast('Transferencia registrada'); refresh(); };
+}
+
+// ================= Extractos bancarios (Itaú / Mercado Pago / otros) =================
+const EXT={cuenta:null, file:'', head:[], body:[], map:{}, items:[]};
+const EXT_FIELDS=[['fecha','Fecha *'],['desc','Descripción'],['importe','Importe (con signo)'],['debito','Débito'],['credito','Crédito'],['saldo','Saldo'],['ref','Nº referencia / operación']];
+const EXT_RX={
+  fecha:/^(fecha|date|release_date|fecha_de_liberacion|fecha_de_operacion|fecha_de_aprobacion|fecha_movimiento|fecha_valor|f_valor|fecha_contable)$/,
+  desc:/^(descripcion|concepto|detalle|transaction_type|description|movimiento|tipo_de_operacion|descripcion_del_movimiento|glosa)$/,
+  importe:/^(importe|monto|valor|transaction_net_amount|amount|monto_neto|neto|importe_neto|valor_neto)$/,
+  debito:/^(debito|debitos|debe|egreso|egresos|cargo|cargos|retiro)$/,
+  credito:/^(credito|creditos|haber|ingreso|ingresos|abono|deposito)$/,
+  saldo:/^(saldo|partial_balance|balance|saldo_parcial)$/,
+  ref:/^(referencia|reference_id|id_de_operacion|numero_de_operacion|n_de_operacion|nro_operacion|operacion|comprobante|documento|nro_documento|id)$/};
+const EXT_CATS=[[/\bbps\b/,'Costos fijos'],[/\birae\b/,'IRAE'],[/\bdgi\b|\biva\b/,'IVA'],[/mercado ?libre|\bmeli\b/,'MELI'],[/comision|cargo|mantenimiento/,'Costos fijos'],[/sueldo|salario/,'Sueldos']];
+function openExtracto(){
+  const cs=S.data.cuentas.filter(c=>c.activa!==false);
+  EXT.cuenta=EXT.cuenta||cs[0]?.id; EXT.body=[]; EXT.items=[]; EXT.file='';
+  modal(`<div class="row between"><div><h2>Importar extracto bancario</h2><p class="sub">Excel o CSV exportado del home banking de Itaú o de Mercado Pago. Se detectan las columnas y se marcan los movimientos que ya están cargados.</p></div></div>
+    <div class="fgrid"><label class="f">Cuenta destino<select id="xCta">${cs.map(c=>`<option value="${c.id}" ${c.id==EXT.cuenta?'selected':''}>${esc(c.nombre)} (${c.moneda})</option>`).join('')}</select></label>
+    <label class="f">Archivo<label class="drop" id="xDrop" style="padding:12px">Arrastrá el .xlsx / .xls / .csv o hacé clic<input type="file" id="xFile" accept=".xlsx,.xls,.csv,.txt" class="hidden"></label></label></div>
+    <div id="xBody"></div>
+    <div class="row between" style="margin-top:12px"><span class="muted" id="xMsg"></span><div class="row"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" id="xGo" disabled onclick="doExtracto()">Importar</button></div></div>`, 1150);
+  $('#xCta').onchange=e=>{ EXT.cuenta=+e.target.value; if(EXT.body.length) buildExt(); };
+  const inp=$('#xFile'), dr=$('#xDrop');
+  inp.onchange=()=>inp.files[0]&&readExtracto(inp.files[0]);
+  dr.ondragover=e=>{e.preventDefault(); dr.style.borderColor='var(--brand)'}; dr.ondragleave=()=>dr.style.borderColor='';
+  dr.ondrop=e=>{e.preventDefault(); e.dataTransfer.files[0]&&readExtracto(e.dataTransfer.files[0]);};
+}
+function parseCSV(txt){
+  const first=txt.split(/\r?\n/).slice(0,5).join('\n'); const d=[';','\t',','].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<txt.length;i++){ const ch=txt[i];
+    if(q){ if(ch==='"'){ if(txt[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true; else if(ch===d){ row.push(cur); cur=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&txt[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=ch; }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); } return rows;
+}
+async function readExtracto(file){
+  let grid;
+  try{
+    if(/\.(csv|txt)$/i.test(file.name)){ let txt=await file.text(); if(txt.includes('�')) txt=new TextDecoder('latin1').decode(await file.arrayBuffer()); grid=parseCSV(txt.replace(/^﻿/,'')); }
+    else { const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+      let best=null; wb.SheetNames.forEach(n=>{ const g=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:true}); if(!best||g.length>best.length) best=g; }); grid=best; }
+  }catch(e){ $('#xMsg').textContent='No se pudo leer el archivo: '+e.message; return; }
+  // detectar fila de encabezados
+  let hi=-1;
+  for(let i=0;i<Math.min(grid.length,60);i++){ const ks=grid[i].map(norm);
+    if(ks.some(k=>EXT_RX.fecha.test(k)||k.startsWith('fecha')) && ks.some(k=>EXT_RX.importe.test(k)||EXT_RX.debito.test(k)||EXT_RX.credito.test(k))){ hi=i; break; } }
+  if(hi<0){ $('#xMsg').innerHTML='<span class="neg">No encontré la fila de encabezados (Fecha + Débito/Crédito o Importe).</span>'; return; }
+  EXT.file=file.name; EXT.head=grid[hi].map(h=>String(h).trim());
+  EXT.body=grid.slice(hi+1).filter(r=>r.some(v=>v!==''&&v!=null));
+  const ks=EXT.head.map(norm); EXT.map={};
+  Object.keys(EXT_RX).forEach(f=>{ let i=ks.findIndex(k=>EXT_RX[f].test(k)); if(i<0&&f==='fecha') i=ks.findIndex(k=>k.startsWith('fecha')); if(i<0&&f==='desc') i=ks.findIndex(k=>/descrip|concepto|detalle/.test(k)); if(i>=0) EXT.map[f]=i; });
+  if(EXT.map.importe!=null && (EXT.map.debito!=null||EXT.map.credito!=null)) delete EXT.map.importe;
+  // sugerir cuenta según archivo
+  const mp=/mercado|mp_|account_statement|release_date/i.test(file.name+' '+EXT.head.join(' '));
+  if(mp){ const c=S.data.cuentas.find(c=>/mercado/i.test(c.nombre)); if(c){ EXT.cuenta=c.id; $('#xCta').value=c.id; } }
+  buildExt();
+}
+function extHash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
+function extCat(desc, signo){ const n=norm(desc).replace(/_/g,' '); for(const [rx,c] of EXT_CATS) if(rx.test(n)) return c; return signo>0?'Ventas':'Otros'; }
+function buildExt(){
+  const M=EXT.map, cta=S.data.cuentas.find(c=>c.id==EXT.cuenta), cell=(r,f)=>M[f]!=null?r[M[f]]:'';
+  const prev=S.data.movs.filter(m=>m.cuenta_id==EXT.cuenta);
+  const refs=new Set(prev.map(m=>m.ref_banco).filter(Boolean));
+  const loose=new Set(prev.map(m=>`${m.fecha}|${Math.round(Number(m.monto)*100)}|${['ingreso','aporte','transferencia_in'].includes(m.tipo)?1:-1}`));
+  const seen={};
+  EXT.items=EXT.body.map((r,i)=>{
+    const fecha=parseDate(cell(r,'fecha')); let imp;
+    if(M.importe!=null) imp=parseNum(cell(r,'importe'));
+    else { const d=Math.abs(parseNum(cell(r,'debito'))||0), c=Math.abs(parseNum(cell(r,'credito'))||0); imp=c-d; }
+    const desc=String(cell(r,'desc')??'').trim(), saldo=parseNum(cell(r,'saldo')), refv=String(cell(r,'ref')??'').trim();
+    const it={i, fecha, imp, desc, saldo, refv, err:null};
+    if(!fecha||fecha==='x') it.err='fecha inválida'; else if(imp==null||isNaN(imp)||imp===0) it.err='sin importe';
+    if(it.err) return {...it, on:false};
+    let key=refv? 'r:'+refv : 'h:'+extHash(`${fecha}|${imp.toFixed(2)}|${norm(desc)}|${saldo??''}`);
+    seen[key]=(seen[key]||0)+1; if(seen[key]>1) key+='#'+seen[key];
+    it.ref=key; it.tipo=imp>0?'ingreso':'pago'; it.cat=extCat(desc,imp); it.ent='';
+    if(refs.has(key)) it.estado='ya importado';
+    else if(loose.has(`${fecha}|${Math.round(Math.abs(imp)*100)}|${imp>0?1:-1}`)) it.estado='posible duplicado';
+    else it.estado='nuevo';
+    it.on=it.estado==='nuevo'; return it;
+  });
+  const ok=EXT.items.filter(x=>!x.err);
+  const fechas=ok.map(x=>x.fecha).sort();
+  // saldo final según extracto (según orden del archivo)
+  let sFin=null; if(M.saldo!=null&&ok.length){ const desc=ok[0].fecha>ok[ok.length-1].fecha; const last=desc?ok[0]:ok[ok.length-1]; sFin=last.saldo; }
+  const cats=[...new Set([...S.data.movs.map(m=>m.categoria).filter(Boolean),'Ventas','Cobro cliente','Proveedores','Importación','Sueldos','Costos fijos','IVA','IRAE','MELI','Transferencia','Comisiones bancarias','Otros'])].sort();
+  const colSel=f=>`<select data-map="${f}"><option value="">—</option>${EXT.head.map((h,i)=>`<option value="${i}" ${M[f]===i?'selected':''}>${esc(h||'(col '+(i+1)+')')}</option>`).join('')}</select>`;
+  const entOpts=`<option value="">—</option><optgroup label="Clientes">${S.data.clientes.map(c=>`<option value="c:${c.id}">${esc(c.nombre)}</option>`).join('')}</optgroup><optgroup label="Proveedores">${S.data.proveedores.map(p=>`<option value="p:${p.id}">${esc(p.nombre)}</option>`).join('')}</optgroup>`;
+  const TIPOS=[['ingreso','Ingreso'],['pago','Pago'],['aporte','Aporte socio'],['retiro','Retiro socio'],['transferencia_in','Transf. entrante'],['transferencia_out','Transf. saliente']];
+  const cur=cta?.moneda||'UYU';
+  $('#xBody').innerHTML=`<div class="card" style="margin-top:12px;padding:12px">
+    <div class="row between"><b>${esc(EXT.file)}</b><span class="muted">${EXT.body.length} filas · ${fechas.length?fdate(fechas[0])+' → '+fdate(fechas.at(-1)):''}</span></div>
+    <div class="xmap">${EXT_FIELDS.map(([f,l])=>`<label class="f">${l}${colSel(f)}</label>`).join('')}</div>
+    <p class="muted" style="margin:0">Usá <i>Importe</i> si el archivo trae una sola columna con signo (Mercado Pago), o <i>Débito/Crédito</i> si vienen separadas (Itaú).
+    ${sFin!=null?` · Saldo final según extracto: <b>${fmt(sFin,cur)}</b>`:''}</p></div>
+    <div class="row between" style="margin:10px 0 6px"><div class="row" style="gap:6px">
+      <button class="btn" onclick="extAll(1)">Marcar nuevos</button><button class="btn" onclick="extAll(2)">Marcar todos</button><button class="btn" onclick="extAll(0)">Desmarcar</button></div>
+      <span id="xSum" class="muted"></span></div>
+    <datalist id="xCats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <div class="xtwrap"><table class="xt"><thead><tr><th></th><th>Fecha</th><th>Descripción</th><th style="text-align:right">Importe</th><th>Tipo</th><th>Categoría</th><th>Cliente / proveedor</th><th>Estado</th></tr></thead><tbody>
+    ${EXT.items.map((x,k)=>x.err?`<tr class="off"><td></td><td>${esc(String(cell(EXT.body[k],'fecha')))}</td><td>${esc(x.desc)}</td><td class="n">${esc(String(x.imp??''))}</td><td colspan="4" class="neg">${x.err}</td></tr>`:
+      `<tr data-k="${k}" class="${x.on?'':'off'}"><td><input type="checkbox" data-f="on" ${x.on?'checked':''}></td><td style="white-space:nowrap">${fdate(x.fecha)}</td><td style="min-width:200px">${esc(x.desc)}</td>
+      <td class="n ${x.imp>0?'pos':'neg'}">${fmt(x.imp,cur)}</td>
+      <td><select data-f="tipo">${TIPOS.filter(([t])=>(x.imp>0)===['ingreso','aporte','transferencia_in'].includes(t)).map(([t,l])=>`<option value="${t}" ${x.tipo===t?'selected':''}>${l}</option>`).join('')}</select></td>
+      <td><input data-f="cat" list="xCats" value="${esc(x.cat)}"></td><td><select data-f="ent">${entOpts}</select></td>
+      <td><span class="tag" style="${x.estado==='nuevo'?'':'color:var(--warn,#b7791f)'}">${x.estado}</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+  $$('#xBody [data-map]').forEach(s=>s.onchange=()=>{ const v=s.value; if(v==='') delete EXT.map[s.dataset.map]; else EXT.map[s.dataset.map]=+v; buildExt(); });
+  $$('#xBody tr[data-k]').forEach(tr=>{ const x=EXT.items[+tr.dataset.k];
+    tr.querySelectorAll('[data-f]').forEach(el=>{ el.onchange=el.oninput=()=>{ const f=el.dataset.f; if(f==='on'){ x.on=el.checked; tr.classList.toggle('off',!x.on); extSum(); } else x[f]=el.value; }; }); });
+  extSum();
+}
+function extAll(mode){ EXT.items.forEach(x=>{ if(!x.err) x.on = mode===2 ? true : mode===1 ? x.estado==='nuevo' : false; }); buildExt(); }
+function extSum(){
+  const sel=EXT.items.filter(x=>x.on&&!x.err), cur=S.data.cuentas.find(c=>c.id==EXT.cuenta)?.moneda||'UYU';
+  const ing=sel.filter(x=>x.imp>0).reduce((a,x)=>a+x.imp,0), eg=sel.filter(x=>x.imp<0).reduce((a,x)=>a-x.imp,0);
+  const sa=Number(S.data.saldos.find(s=>s.id==EXT.cuenta)?.saldo||0);
+  const n=EXT.items.filter(x=>!x.err), ya=n.filter(x=>x.estado!=='nuevo').length;
+  $('#xSum').innerHTML=`${sel.length} seleccionados · <span class="pos">+${fmt(ing,cur)}</span> · <span class="neg">−${fmt(eg,cur)}</span> · saldo en sistema quedaría <b>${fmt(sa+ing-eg,cur)}</b>${ya?` · ${ya} ya cargados`:''}`;
+  const b=$('#xGo'); b.disabled=!sel.length; b.textContent=`Importar ${sel.length} movimientos`;
+}
+async function doExtracto(){
+  const sel=EXT.items.filter(x=>x.on&&!x.err); if(!sel.length) return;
+  const cta=S.data.cuentas.find(c=>c.id==EXT.cuenta);
+  if(!confirm(`¿Importar ${sel.length} movimientos en ${cta.nombre}?`)) return;
+  const rows=sel.map(x=>{ const [t,id]=(x.ent||'').split(':');
+    return {fecha:x.fecha, cuenta_id:cta.id, tipo:x.tipo, monto:Math.round(Math.abs(x.imp)*100)/100, categoria:x.cat||null,
+      descripcion:(x.desc||'').slice(0,500)||null, comprobante:x.refv||null, ref_banco:x.ref,
+      cliente_id:t==='c'?+id:null, proveedor_id:t==='p'?+id:null}; });
+  const b=$('#xGo'); b.disabled=true; b.textContent='Importando…';
+  for(let i=0;i<rows.length;i+=200){
+    const {error}=await sb.from('movimientos').insert(rows.slice(i,i+200));
+    if(error){ $('#xMsg').innerHTML=`<span class="neg">${esc(error.message.includes('duplicate')?'Algunos movimientos ya estaban importados. Recargá y volvé a intentar.':error.message)}</span>`; b.disabled=false; if(i) refresh(); return; }
+  }
+  closeModal(); toast(`${rows.length} movimientos importados en ${cta.nombre}`,4000); refresh();
 }
 
 // ================= Import / Export =================
